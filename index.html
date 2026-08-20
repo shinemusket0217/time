@@ -85,7 +85,7 @@
     .month-day:nth-child(7n+1) .date-num { color: #e53935; }
     .month-day:nth-child(7n) .date-num { color: #1e88e5; }
 
-    /* 수행평가 카드 공통 */
+    /* 수행평가 및 일정 카드 공통 */
     .eval-card {
       background: #e3f2fd; border-left: 3px solid #2196f3; padding: 6px; border-radius: 4px; margin-bottom: 4px; cursor: pointer; transition: transform 0.2s;
     }
@@ -133,49 +133,33 @@
     <div id="view-today" class="today-container hidden">
       <div class="today-header-box">
         <div class="today-date">📌 오늘 (2026년 8월 20일 목요일) 일정</div>
-        <div class="today-subtext">오늘 점검해야 할 수행평가 및 준비물입니다.</div>
+        <div class="today-subtext">오늘 점검해야 할 중요한 학급 일정 및 준비물입니다.</div>
       </div>
       <div class="todo-list">
-        <!-- 오늘 할 일 목록 -->
+        <!-- 오늘 할 일: 회장 선거 -->
         <div class="todo-item urgent">
           <div class="todo-text-group">
-            <span class="todo-subject">[내일 제출 D-1] 영어</span>
-            <span class="todo-title">영시 암송 구절 외우기 & 유인물 챙기기</span>
-            <span class="todo-prep">🎒 준비물: 영어 프린트 유인물</span>
+            <span class="todo-subject">[중요] 학급 일정</span>
+            <span class="todo-title">🗳️ 학급 회장 선거</span>
+            <span class="todo-prep">📌 준비물/주의사항: 후보자 소견 발표 준비 및 공정한 투표 참여</span>
           </div>
-          <button class="detail-badge" onclick="openModal('영어', '8월 21일(금) 2교시', '영시 암송 평가 및 해석지 제출', '영어 유인물')">상세보기</button>
-        </div>
-
-        <div class="todo-item">
-          <div class="todo-text-group">
-            <span class="todo-subject">수학</span>
-            <span class="todo-title">이차함수 문제 풀이 오답 정리</span>
-            <span class="todo-prep">🎒 준비물: 수학 교과서, 연습장</span>
-          </div>
-          <button class="detail-badge" onclick="openModal('수학', '8월 19일(수) 5교시 완료', '이차함수 문제 발표 오답 확인', '교과서, 연습장')">상세보기</button>
+          <button class="detail-badge" onclick="openModal('학급 회장 선거', '8월 20일(목)', '2학기 학급 회장 및 부회장 선거 진행', '후보자 소견 발표 준비 (해당자)')">상세보기</button>
         </div>
       </div>
     </div>
 
     <!-- 2) 주간 시간표 뷰 -->
     <div id="view-weekly" class="timetable-weekly hidden">
-      <div class="day-column"><div class="day-header">월 (8/17)</div>
-        <div class="eval-card urgent" onclick="openModal('국어', '8월 17일(월) 3교시', '서평 작성하기 (1,000자)', '원고지, 필기구, 읽은 책')">
-          <div class="subject">국어</div><div class="title">서평 작성하기</div>
-        </div>
-      </div>
+      <div class="day-column"><div class="day-header">월 (8/17)</div></div>
       <div class="day-column"><div class="day-header">화 (8/18)</div></div>
-      <div class="day-column"><div class="day-header">수 (8/19)</div>
-        <div class="eval-card" onclick="openModal('수학', '8월 19일(수) 5교시', '이차함수 문제 발표', '교과서, 연습장')">
-          <div class="subject">수학</div><div class="title">함수 문제 발표</div>
+      <div class="day-column"><div class="day-header">수 (8/19)</div></div>
+      <div class="day-column">
+        <div class="day-header">목 (8/20)</div>
+        <div class="eval-card urgent" onclick="openModal('학급 회장 선거', '8월 20일(목)', '2학기 학급 회장 및 부회장 선거 진행', '후보자 소견 발표 준비 (해당자)')">
+          <div class="subject">학급</div><div class="title">🗳️ 회장 선거</div>
         </div>
       </div>
-      <div class="day-column"><div class="day-header">목 (8/20)</div></div>
-      <div class="day-column"><div class="day-header">금 (8/21)</div>
-        <div class="eval-card" onclick="openModal('영어', '8월 21일(금) 2교시', '영시 암송 평가', '유인물')">
-          <div class="subject">영어</div><div class="title">영시 암송 평가</div>
-        </div>
-      </div>
+      <div class="day-column"><div class="day-header">금 (8/21)</div></div>
     </div>
 
     <!-- 3) 2026년 8월 월간 시간표 뷰 -->
@@ -207,29 +191,18 @@
         <div class="month-day"><div class="date-num">14</div></div>
         <div class="month-day"><div class="date-num">15</div></div>
         <div class="month-day"><div class="date-num">16</div></div>
-        
-        <div class="month-day"><div class="date-num">17</div>
-          <div class="eval-card urgent" onclick="openModal('국어', '8월 17일(월) 3교시', '서평 작성하기 (1,000자)', '원고지, 필기구, 읽은 책')">
-            <div class="subject">국어</div><div class="title">서평 작성</div>
-          </div>
-        </div>
-
+        <div class="month-day"><div class="date-num">17</div></div>
         <div class="month-day"><div class="date-num">18</div></div>
+        <div class="month-day"><div class="date-num">19</div></div>
 
-        <div class="month-day"><div class="date-num">19</div>
-          <div class="eval-card" onclick="openModal('수학', '8월 19일(수) 5교시', '이차함수 문제 발표', '교과서, 연습장')">
-            <div class="subject">수학</div><div class="title">문제 발표</div>
+        <!-- 8월 20일 목요일 (회장 선거) -->
+        <div class="month-day"><div class="date-num">20</div>
+          <div class="eval-card urgent" onclick="openModal('학급 회장 선거', '8월 20일(목)', '2학기 학급 회장 및 부회장 선거 진행', '후보자 소견 발표 준비 (해당자)')">
+            <div class="subject">학급</div><div class="title">🗳️ 회장선거</div>
           </div>
         </div>
 
-        <div class="month-day"><div class="date-num">20</div></div>
-
-        <div class="month-day"><div class="date-num">21</div>
-          <div class="eval-card" onclick="openModal('영어', '8월 21일(금) 2교시', '영시 암송 평가', '유인물')">
-            <div class="subject">영어</div><div class="title">영시 암송</div>
-          </div>
-        </div>
-
+        <div class="month-day"><div class="date-num">21</div></div>
         <div class="month-day"><div class="date-num">22</div></div>
         <div class="month-day"><div class="date-num">23</div></div>
         <div class="month-day"><div class="date-num">24</div></div>
@@ -256,8 +229,8 @@
       <div class="modal-title" id="m-subject">과목명</div>
       <div class="modal-info">
         <p><strong>일시:</strong> <span id="m-date"></span></p>
-        <p><strong>수행 내용:</strong> <span id="m-detail"></span></p>
-        <p><strong>준비물:</strong> <span id="m-prep"></span></p>
+        <p><strong>상세 내용:</strong> <span id="m-detail"></span></p>
+        <p><strong>준비물 / 비고:</strong> <span id="m-prep"></span></p>
       </div>
     </div>
   </div>
