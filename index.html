@@ -51,19 +51,17 @@
     .todo-list { display: flex; flex-direction: column; gap: 12px; }
     .todo-item {
       display: flex; align-items: center; justify-content: space-between;
-      background: #f8f9fa; padding: 14px 18px; border-radius: 10px; border-left: 5px solid #2196f3;
+      background: #f8f9fa; padding: 16px 20px; border-radius: 10px; border-left: 5px solid #2196f3;
     }
     .todo-item.urgent { border-left-color: #f44336; background: #fff8f8; }
-    .todo-left { display: flex; align-items: center; gap: 12px; }
-    .todo-checkbox { width: 20px; height: 20px; cursor: pointer; }
     .todo-text-group { display: flex; flex-direction: column; }
-    .todo-subject { font-size: 0.8em; font-weight: bold; color: #2196f3; }
-    .todo-title { font-size: 1em; font-weight: bold; color: #333; margin-top: 2px; }
-    .todo-prep { font-size: 0.85em; color: #666; margin-top: 2px; }
-    .todo-title.done { text-decoration: line-through; color: #aaa; }
+    .todo-subject { font-size: 0.85em; font-weight: bold; color: #2196f3; }
+    .todo-item.urgent .todo-subject { color: #f44336; }
+    .todo-title { font-size: 1.05em; font-weight: bold; color: #333; margin-top: 4px; }
+    .todo-prep { font-size: 0.88em; color: #666; margin-top: 4px; }
     .detail-badge {
-      background: #e3f2fd; color: #1e88e5; border: none; padding: 8px 14px;
-      border-radius: 8px; font-size: 0.85em; font-weight: bold; cursor: pointer;
+      background: #e3f2fd; color: #1e88e5; border: none; padding: 10px 16px;
+      border-radius: 8px; font-size: 0.85em; font-weight: bold; cursor: pointer; flex-shrink: 0; margin-left: 12px;
     }
     .detail-badge:hover { background: #bbdefb; }
 
@@ -135,30 +133,24 @@
     <div id="view-today" class="today-container hidden">
       <div class="today-header-box">
         <div class="today-date">📌 오늘 (2026년 8월 20일 목요일) 일정</div>
-        <div class="today-subtext">오늘 제출/발표해야 하거나 내일 수행평가 준비물을 체크해 보세요!</div>
+        <div class="today-subtext">오늘 점검해야 할 수행평가 및 준비물입니다.</div>
       </div>
       <div class="todo-list">
-        <!-- 오늘 할 일 목록 예시 (체크박스 기능 제공) -->
+        <!-- 오늘 할 일 목록 -->
         <div class="todo-item urgent">
-          <div class="todo-left">
-            <input type="checkbox" class="todo-checkbox" onchange="toggleDone(this)">
-            <div class="todo-text-group">
-              <span class="todo-subject">[내일 제출 D-1] 영어</span>
-              <span class="todo-title">영시 암송 구절 외우기 & 유인물 챙기기</span>
-              <span class="todo-prep">🎒 준비물: 영어 프린트 유인물</span>
-            </div>
+          <div class="todo-text-group">
+            <span class="todo-subject">[내일 제출 D-1] 영어</span>
+            <span class="todo-title">영시 암송 구절 외우기 & 유인물 챙기기</span>
+            <span class="todo-prep">🎒 준비물: 영어 프린트 유인물</span>
           </div>
           <button class="detail-badge" onclick="openModal('영어', '8월 21일(금) 2교시', '영시 암송 평가 및 해석지 제출', '영어 유인물')">상세보기</button>
         </div>
 
         <div class="todo-item">
-          <div class="todo-left">
-            <input type="checkbox" class="todo-checkbox" onchange="toggleDone(this)">
-            <div class="todo-text-group">
-              <span class="todo-subject">수학</span>
-              <span class="todo-title">이차함수 문제 풀이 오답 정리</span>
-              <span class="todo-prep">🎒 준비물: 수학 교과서, 연습장</span>
-            </div>
+          <div class="todo-text-group">
+            <span class="todo-subject">수학</span>
+            <span class="todo-title">이차함수 문제 풀이 오답 정리</span>
+            <span class="todo-prep">🎒 준비물: 수학 교과서, 연습장</span>
           </div>
           <button class="detail-badge" onclick="openModal('수학', '8월 19일(수) 5교시 완료', '이차함수 문제 발표 오답 확인', '교과서, 연습장')">상세보기</button>
         </div>
@@ -308,15 +300,6 @@
     function showHome() {
       document.getElementById('selection-screen').classList.remove('hidden');
       document.getElementById('main-content').classList.add('hidden');
-    }
-
-    function toggleDone(checkbox) {
-      const titleElem = checkbox.nextElementSibling.querySelector('.todo-title');
-      if (checkbox.checked) {
-        titleElem.classList.add('done');
-      } else {
-        titleElem.classList.remove('done');
-      }
     }
 
     function openModal(subject, date, detail, prep) {
