@@ -10,7 +10,7 @@
     
     .hidden { display: none !important; }
 
-    /* 1. 첫 접속 선택 화면 (랜딩 페이지) */
+    /* 1. 첫 접속 선택 화면 */
     #selection-screen {
       display: flex;
       flex-direction: column;
@@ -28,7 +28,7 @@
     }
     .choice-btn:hover { background: #2196f3; color: white; transform: translateY(-3px); }
 
-    /* 상단 네비게이션 바 (시간표 화면 내부) */
+    /* 상단 네비게이션 바 */
     .top-nav {
       display: flex; gap: 10px; margin-bottom: 20px; width: 100%; max-width: 900px; justify-content: space-between; align-items: center;
     }
@@ -46,22 +46,30 @@
     .day-column { background: #ffffff; border-radius: 12px; padding: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
     .day-header { text-align: center; font-weight: bold; padding-bottom: 10px; border-bottom: 2px solid #eee; margin-bottom: 10px; }
 
-    /* 3. 월간 시간표 그리드 */
+    /* 3. 2026년 8월 달력 스타일 */
+    .monthly-container { width: 100%; max-width: 900px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .month-caption { text-align: center; font-size: 1.4em; font-weight: bold; margin-bottom: 15px; color: #333; }
     .timetable-monthly {
-      display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; width: 100%; max-width: 900px; background: white; padding: 16px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
     }
-    .month-header { text-align: center; font-weight: bold; padding: 8px; color: #666; font-size: 0.9em; }
-    .month-day { min-height: 80px; border: 1px solid #f0f0f0; border-radius: 6px; padding: 4px; font-size: 0.8em; }
+    .month-header { text-align: center; font-weight: bold; padding: 8px 0; color: #555; font-size: 0.9em; background: #f8f9fa; border-radius: 4px; }
+    .month-header.sun { color: #e53935; }
+    .month-header.sat { color: #1e88e5; }
+    
+    .month-day { min-height: 85px; border: 1px solid #eee; border-radius: 6px; padding: 6px; font-size: 0.8em; background: #fff; }
+    .month-day.other-month { background: #fafafa; opacity: 0.5; }
     .date-num { font-weight: bold; margin-bottom: 4px; color: #333; }
+    .month-day:nth-child(7n+1) .date-num { color: #e53935; } /* 일요일 */
+    .month-day:nth-child(7n) .date-num { color: #1e88e5; } /* 토요일 */
 
     /* 수행평가 카드 공통 */
     .eval-card {
-      background: #e3f2fd; border-left: 4px solid #2196f3; padding: 8px; border-radius: 6px; margin-bottom: 6px; cursor: pointer; transition: transform 0.2s;
+      background: #e3f2fd; border-left: 3px solid #2196f3; padding: 6px; border-radius: 4px; margin-bottom: 4px; cursor: pointer; transition: transform 0.2s;
     }
     .eval-card:hover { transform: translateY(-2px); background: #bbdefb; }
     .eval-card.urgent { background: #ffebee; border-color: #f44336; }
     .subject { font-weight: bold; font-size: 0.85em; color: #333; }
-    .title { font-size: 0.8em; color: #555; margin-top: 2px; }
+    .title { font-size: 0.75em; color: #555; margin-top: 2px; }
 
     /* 상세 모달 (팝업창) */
     .modal-overlay {
@@ -81,13 +89,13 @@
     <div class="select-title">📅 확인하고 싶은 일정을 선택하세요</div>
     <div class="btn-container">
       <button class="choice-btn" onclick="showView('weekly')">이번 주 시간표</button>
-      <button class="choice-btn" onclick="showView('monthly')">이번 달 시간표</button>
+      <button class="choice-btn" onclick="showView('monthly')">이번 달 시간표 (8월)</button>
     </div>
   </div>
 
-  <!-- 2. 메인 시간표 영역 (처음에는 숨김) -->
+  <!-- 2. 메인 시간표 영역 -->
   <div id="main-content" class="hidden" style="width: 100%; max-width: 900px;">
-    <!-- 상단 탭 버튼 -->
+    <!-- 상단 네비게이션 -->
     <div class="top-nav">
       <button class="home-btn" onclick="showHome()">🏠 첫 화면으로</button>
       <div class="nav-tabs">
@@ -98,50 +106,107 @@
 
     <!-- 주간 시간표 뷰 -->
     <div id="view-weekly" class="timetable-weekly">
-      <div class="day-column"><div class="day-header">월</div>
-        <div class="eval-card urgent" onclick="openModal('국어', '8월 17일(월) 3교시', '서평 작성하기', '원고지, 필기구')">
+      <div class="day-column"><div class="day-header">월 (8/17)</div>
+        <div class="eval-card urgent" onclick="openModal('국어', '8월 17일(월) 3교시', '서평 작성하기 (1,000자)', '원고지, 필기구, 읽은 책')">
           <div class="subject">국어</div><div class="title">서평 작성하기</div>
         </div>
       </div>
-      <div class="day-column"><div class="day-header">화</div></div>
-      <div class="day-column"><div class="day-header">수</div>
-        <div class="eval-card" onclick="openModal('수학', '8월 19일(수) 5교시', '함수 문제 발표', '교과서')">
+      <div class="day-column"><div class="day-header">화 (8/18)</div></div>
+      <div class="day-column"><div class="day-header">수 (8/19)</div>
+        <div class="eval-card" onclick="openModal('수학', '8월 19일(수) 5교시', '이차함수 문제 발표', '교과서, 연습장')">
           <div class="subject">수학</div><div class="title">함수 문제 발표</div>
         </div>
       </div>
-      <div class="day-column"><div class="day-header">목</div></div>
-      <div class="day-column"><div class="day-header">금</div>
+      <div class="day-column"><div class="day-header">목 (8/20)</div></div>
+      <div class="day-column"><div class="day-header">금 (8/21)</div>
         <div class="eval-card" onclick="openModal('영어', '8월 21일(금) 2교시', '영시 암송 평가', '유인물')">
           <div class="subject">영어</div><div class="title">영시 암송 평가</div>
         </div>
       </div>
     </div>
 
-    <!-- 월간 시간표 뷰 -->
-    <div id="view-monthly" class="timetable-monthly hidden">
-      <div class="month-header">일</div><div class="month-header">월</div><div class="month-header">화</div>
-      <div class="month-header">수</div><div class="month-header">목</div><div class="month-header">금</div><div class="month-header">토</div>
-      
-      <!-- 예시 날짜 셀 (필요에 따라 달력 날짜 채우기) -->
-      <div class="month-day"><div class="date-num">17</div>
-        <div class="eval-card urgent" onclick="openModal('국어', '8월 17일(월)', '서평 작성하기', '원고지')">
-          <div class="subject">국어</div>
+    <!-- 2026년 8월 월간 시간표 뷰 -->
+    <div id="view-monthly" class="monthly-container hidden">
+      <div class="month-caption">🗓️ 2026년 8월</div>
+      <div class="timetable-monthly">
+        <!-- 요일 헤더 -->
+        <div class="month-header sun">일</div>
+        <div class="month-header">월</div>
+        <div class="month-header">화</div>
+        <div class="month-header">수</div>
+        <div class="month-header">목</div>
+        <div class="month-header">금</div>
+        <div class="month-header sat">토</div>
+
+        <!-- 8월 1일 전 빈 칸 (일~금: 6칸) -->
+        <div class="month-day other-month"></div>
+        <div class="month-day other-month"></div>
+        <div class="month-day other-month"></div>
+        <div class="month-day other-month"></div>
+        <div class="month-day other-month"></div>
+        <div class="month-day other-month"></div>
+
+        <!-- 8월 날짜들 (1일 ~ 31일) -->
+        <div class="month-day"><div class="date-num">1</div></div>
+        <div class="month-day"><div class="date-num">2</div></div>
+        <div class="month-day"><div class="date-num">3</div></div>
+        <div class="month-day"><div class="date-num">4</div></div>
+        <div class="month-day"><div class="date-num">5</div></div>
+        <div class="month-day"><div class="date-num">6</div></div>
+        <div class="month-day"><div class="date-num">7</div></div>
+        <div class="month-day"><div class="date-num">8</div></div>
+        <div class="month-day"><div class="date-num">9</div></div>
+        <div class="month-day"><div class="date-num">10</div></div>
+        <div class="month-day"><div class="date-num">11</div></div>
+        <div class="month-day"><div class="date-num">12</div></div>
+        <div class="month-day"><div class="date-num">13</div></div>
+        <div class="month-day"><div class="date-num">14</div></div>
+        <div class="month-day"><div class="date-num">15</div></div>
+        <div class="month-day"><div class="date-num">16</div></div>
+        
+        <!-- 8/17 월요일 -->
+        <div class="month-day"><div class="date-num">17</div>
+          <div class="eval-card urgent" onclick="openModal('국어', '8월 17일(월) 3교시', '서평 작성하기 (1,000자)', '원고지, 필기구, 읽은 책')">
+            <div class="subject">국어</div><div class="title">서평 작성</div>
+          </div>
         </div>
-      </div>
-      <div class="month-day"><div class="date-num">18</div></div>
-      <div class="month-day"><div class="date-num">19</div>
-        <div class="eval-card" onclick="openModal('수학', '8월 19일(수)', '함수 문제 발표', '교과서')">
-          <div class="subject">수학</div>
+
+        <div class="month-day"><div class="date-num">18</div></div>
+
+        <!-- 8/19 수요일 -->
+        <div class="month-day"><div class="date-num">19</div>
+          <div class="eval-card" onclick="openModal('수학', '8월 19일(수) 5교시', '이차함수 문제 발표', '교과서, 연습장')">
+            <div class="subject">수학</div><div class="title">문제 발표</div>
+          </div>
         </div>
-      </div>
-      <div class="month-day"><div class="date-num">20</div></div>
-      <div class="month-day"><div class="date-num">21</div>
-        <div class="eval-card" onclick="openModal('영어', '8월 21일(금)', '영시 암송 평가', '유인물')">
-          <div class="subject">영어</div>
+
+        <div class="month-day"><div class="date-num">20</div></div>
+
+        <!-- 8/21 금요일 -->
+        <div class="month-day"><div class="date-num">21</div>
+          <div class="eval-card" onclick="openModal('영어', '8월 21일(금) 2교시', '영시 암송 평가', '유인물')">
+            <div class="subject">영어</div><div class="title">영시 암송</div>
+          </div>
         </div>
+
+        <div class="month-day"><div class="date-num">22</div></div>
+        <div class="month-day"><div class="date-num">23</div></div>
+        <div class="month-day"><div class="date-num">24</div></div>
+        <div class="month-day"><div class="date-num">25</div></div>
+        <div class="month-day"><div class="date-num">26</div></div>
+        <div class="month-day"><div class="date-num">27</div></div>
+        <div class="month-day"><div class="date-num">28</div></div>
+        <div class="month-day"><div class="date-num">29</div></div>
+        <div class="month-day"><div class="date-num">30</div></div>
+        <div class="month-day"><div class="date-num">31</div></div>
+
+        <!-- 8월 마지막 날 이후 빈 칸 (화~토: 5칸) -->
+        <div class="month-day other-month"></div>
+        <div class="month-day other-month"></div>
+        <div class="month-day other-month"></div>
+        <div class="month-day other-month"></div>
+        <div class="month-day other-month"></div>
       </div>
-      <div class="month-day"><div class="date-num">22</div></div>
-      <div class="month-day"><div class="date-num">23</div></div>
     </div>
   </div>
 
