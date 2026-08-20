@@ -19,7 +19,7 @@
       margin-top: 50px;
       text-align: center;
     }
-    .select-title { font-size: 1.8em; color: #333; margin-bottom: 30px; }
+    .select-title { font-size: 1.8em; font-weight: bold; color: #333; margin-bottom: 30px; }
     .btn-container { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; max-width: 800px; }
     .choice-btn {
       background: white; border: 2px solid #2196f3; color: #2196f3;
@@ -44,9 +44,8 @@
 
     /* 2. 오늘 해야 할 일 화면 스타일 */
     .today-container { width: 100%; max-width: 900px; background: white; padding: 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-    .today-header-box { text-align: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #f0f0f0; }
+    .today-header-box { text-align: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #f0f0f0; }
     .today-date { font-size: 1.4em; font-weight: bold; color: #333; }
-    .today-subtext { color: #666; font-size: 0.9em; margin-top: 6px; }
     
     .todo-list { display: flex; flex-direction: column; gap: 12px; }
     .todo-item {
@@ -58,7 +57,6 @@
     .todo-subject { font-size: 0.85em; font-weight: bold; color: #2196f3; }
     .todo-item.urgent .todo-subject { color: #f44336; }
     .todo-title { font-size: 1.05em; font-weight: bold; color: #333; margin-top: 4px; }
-    .todo-prep { font-size: 0.88em; color: #666; margin-top: 4px; }
     .detail-badge {
       background: #e3f2fd; color: #1e88e5; border: none; padding: 10px 16px;
       border-radius: 8px; font-size: 0.85em; font-weight: bold; cursor: pointer; flex-shrink: 0; margin-left: 12px;
@@ -72,7 +70,7 @@
     .day-column { background: #ffffff; border-radius: 12px; padding: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
     .day-header { text-align: center; font-weight: bold; padding-bottom: 10px; border-bottom: 2px solid #eee; margin-bottom: 10px; }
 
-    /* 4. 2026년 8월 달력 스타일 */
+    /* 4. 월간 달력 스타일 */
     .monthly-container { width: 100%; max-width: 900px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
     .month-caption { text-align: center; font-size: 1.4em; font-weight: bold; margin-bottom: 15px; color: #333; }
     .timetable-monthly { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
@@ -107,13 +105,13 @@
 </head>
 <body>
 
-  <!-- 1. 첫 화면: 3가지 메뉴 선택 -->
+  <!-- 1. 첫 화면: 메뉴 선택 -->
   <div id="selection-screen">
-    <div class="select-title">📅 확인하고 싶은 일정을 선택하세요</div>
+    <div class="select-title">일정 선택</div>
     <div class="btn-container">
-      <button class="choice-btn today-highlight" onclick="showView('today')">📌 오늘 해야 할 일</button>
-      <button class="choice-btn" onclick="showView('weekly')">🗓️ 이번 주 시간표</button>
-      <button class="choice-btn" onclick="showView('monthly')">📆 이번 달 시간표 (8월)</button>
+      <button class="choice-btn today-highlight" onclick="showView('today')">오늘 해야 할 일</button>
+      <button class="choice-btn" onclick="showView('weekly')">이번 주 시간표</button>
+      <button class="choice-btn" onclick="showView('monthly')">이번 달 시간표 (8월)</button>
     </div>
   </div>
 
@@ -121,7 +119,7 @@
   <div id="main-content" class="hidden" style="width: 100%; max-width: 900px;">
     <!-- 상단 네비게이션 -->
     <div class="top-nav">
-      <button class="home-btn" onclick="showHome()">🏠 첫 화면으로</button>
+      <button class="home-btn" onclick="showHome()">첫 화면으로</button>
       <div class="nav-tabs">
         <button id="tab-today" class="tab-btn" onclick="showView('today')">오늘</button>
         <button id="tab-weekly" class="tab-btn" onclick="showView('weekly')">이번 주</button>
@@ -132,18 +130,16 @@
     <!-- 1) 오늘 해야 할 일 뷰 -->
     <div id="view-today" class="today-container hidden">
       <div class="today-header-box">
-        <div class="today-date">📌 오늘 (2026년 8월 20일 목요일) 일정</div>
-        <div class="today-subtext">오늘 점검해야 할 중요한 학급 일정 및 준비물입니다.</div>
+        <div class="today-date">오늘 (2026년 8월 20일 목요일)</div>
       </div>
       <div class="todo-list">
-        <!-- 오늘 할 일: 회장 선거 -->
+        <!-- 오늘 할 일 목록 -->
         <div class="todo-item urgent">
           <div class="todo-text-group">
-            <span class="todo-subject">[중요] 학급 일정</span>
-            <span class="todo-title">🗳️ 학급 회장 선거</span>
-            <span class="todo-prep">📌 준비물/주의사항: 후보자 소견 발표 준비 및 공정한 투표 참여</span>
+            <span class="todo-subject">학급 일정</span>
+            <span class="todo-title">학급 회장 선거</span>
           </div>
-          <button class="detail-badge" onclick="openModal('학급 회장 선거', '8월 20일(목)', '2학기 학급 회장 및 부회장 선거 진행', '기호 2번에 투표하기')">상세보기</button>
+          <button class="detail-badge" onclick="openModal('학급 회장 선거', '8월 20일(목)', '2학기 학급 회장 및 부회장 선거 진행', '후보자 소견 발표 준비 (해당자)')">자세히 보기</button>
         </div>
       </div>
     </div>
@@ -156,7 +152,7 @@
       <div class="day-column">
         <div class="day-header">목 (8/20)</div>
         <div class="eval-card urgent" onclick="openModal('학급 회장 선거', '8월 20일(목)', '2학기 학급 회장 및 부회장 선거 진행', '후보자 소견 발표 준비 (해당자)')">
-          <div class="subject">학급</div><div class="title">🗳️ 회장 선거</div>
+          <div class="subject">학급</div><div class="title">회장 선거</div>
         </div>
       </div>
       <div class="day-column"><div class="day-header">금 (8/21)</div></div>
@@ -164,7 +160,7 @@
 
     <!-- 3) 2026년 8월 월간 시간표 뷰 -->
     <div id="view-monthly" class="monthly-container hidden">
-      <div class="month-caption">🗓️ 2026년 8월</div>
+      <div class="month-caption">2026년 8월</div>
       <div class="timetable-monthly">
         <div class="month-header sun">일</div><div class="month-header">월</div><div class="month-header">화</div>
         <div class="month-header">수</div><div class="month-header">목</div><div class="month-header">금</div><div class="month-header sat">토</div>
@@ -195,10 +191,10 @@
         <div class="month-day"><div class="date-num">18</div></div>
         <div class="month-day"><div class="date-num">19</div></div>
 
-        <!-- 8월 20일 목요일 (회장 선거) -->
+        <!-- 8월 20일 목요일 -->
         <div class="month-day"><div class="date-num">20</div>
-          <div class="eval-card urgent" onclick="openModal('학급 회장 선거', '8월 20일(목)', '2학기 학급 회장 및 부회장 선거 진행', '기호 2번에 투표하기')">
-            <div class="subject">학급</div><div class="title">🗳️ 회장선거</div>
+          <div class="eval-card urgent" onclick="openModal('학급 회장 선거', '8월 20일(목)', '2학기 학급 회장 및 부회장 선거 진행', '후보자 소견 발표 준비 (해당자)')">
+            <div class="subject">학급</div><div class="title">회장 선거</div>
           </div>
         </div>
 
@@ -230,7 +226,7 @@
       <div class="modal-info">
         <p><strong>일시:</strong> <span id="m-date"></span></p>
         <p><strong>상세 내용:</strong> <span id="m-detail"></span></p>
-        <p><strong>해야할일:</strong> <span id="m-prep"></span></p>
+        <p><strong>준비물 / 비고:</strong> <span id="m-prep"></span></p>
       </div>
     </div>
   </div>
