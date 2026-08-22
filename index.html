@@ -110,7 +110,6 @@
 
     // 더미와 플레이어 간 충돌 보정 (미끄러짐 반사)
     function handleCollision() {
-      // 더미 전체 영역 (머리 + 몸통 통합 AABB)
       const box = {
         minX: dummy.x - dummy.bodyWidth / 2,
         maxX: dummy.x + dummy.bodyWidth / 2,
@@ -118,7 +117,6 @@
         maxY: dummy.y + dummy.bodyHeight
       };
 
-      // 사각형 내에서 원의 중심과 가장 가까운 점 계산
       const closestX = Math.max(box.minX, Math.min(player.x, box.maxX));
       const closestY = Math.max(box.minY, Math.min(player.y, box.maxY));
 
@@ -126,9 +124,7 @@
       let dy = player.y - closestY;
       let distance = Math.hypot(dx, dy);
 
-      // 충돌 발생 시 (원의 반지름보다 가까운 경우)
       if (distance < player.radius) {
-        // 원 중심이 사각형 내부에 완벽히 갇혔을 때 예외 처리
         if (distance === 0) {
           const left = player.x - box.minX;
           const right = box.maxX - player.x;
@@ -148,7 +144,6 @@
         const nx = dx / distance;
         const ny = dy / distance;
 
-        // 수직/수평 성분을 제외한 접선 방향 이동만 허용 (미끄러짐 효과)
         player.x += nx * overlap;
         player.y += ny * overlap;
       }
@@ -161,8 +156,13 @@
         player.y += player.dashDirY * player.dashSpeed;
 
         player.dashTimeLeft--;
+        
+        // 돌진이 끝난 경우
         if (player.dashTimeLeft <= 0) {
           player.isDashing = false;
+          // 기존 이동 경로 초기화 (돌진 위치에 정지)
+          player.targetX = player.x;
+          player.targetY = player.y;
         }
       } 
       // 2. 일반 이동
@@ -180,8 +180,10 @@
         }
       }
 
-      // 이동 적용 후 충돌 검사 및 위치 보정
-      handleCollision();
+      // 일반 이동 상태일 때만 충돌 검사 수행 (돌진 중일 때는 통과)
+      if (!player.isDashing) {
+        handleCollision();
+      }
     }
 
     function drawArrow(fromX, fromY, toX, toY, color) {
@@ -271,6 +273,10 @@
       requestAnimationFrame(loop);
     }
 
+    loop();
+  </script>
+</body>
+</html>
     loop();
   </script>
 </body>
