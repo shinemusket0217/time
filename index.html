@@ -56,52 +56,71 @@
       targetY: canvas.height / 2,
       radius: 15,
       color: '#FF69B4',
-      speed: 10 / 3,        // 기본 이동 속도
-      
-      // 돌진 시스템 속성
-      isDashing: false,
-      dashSpeed: 15,        // 돌진 속도 (기본 속도의 약 4.5배)
-      dashDuration: 12,     // 돌진 지속 프레임 수
-      dashTimeLeft: 0,      // 남은 돌진 프레임
-      dashDirX: 0,          // 돌진 고정 방향 X
-      dashDirY: 0           // 돌진 고정 방향 Y
+      speed: 10 / 3,
+
+      // 돌진 시스템
+      isCharging: false,     // W 키 누르고 있는 상태
+      isDashing: false,      // 실제 돌진 중인 상태
+      dashSpeed: 15,
+      dashDuration: 6,       // 거리를 반으로 줄임 (12 -> 6프레임)
+      dashTimeLeft: 0,
+      dashDirX: 0,
+      dashDirY: 0,
+
+      // 쿨타임 시스템
+      cooldownTime: 13000,   // 13초 (밀리초)
+      lastDashTime: 0
     };
 
-    // 마우스 클릭 시 목표 지점 변경
+    // 마우스 클릭 시 이동
     window.addEventListener('click', (e) => {
       player.targetX = e.clientX;
       player.targetY = e.clientY;
     });
 
-    // W키 누를 때 돌진 시작
+    // W 키 눌렀을 때 (조준 시작)
     window.addEventListener('keydown', (e) => {
-      if ((e.key === 'w' || e.key === 'W') && !player.isDashing) {
-        const dx = mouseX - player.x;
-        const dy = mouseY - player.y;
-        const distance = Math.hypot(dx, dy);
+      if ((e.key === 'w' || e.key === 'W') && !e.repeat) {
+        player.isCharging = true;
+      }
+    });
 
-        if (distance > 0) {
-          player.isDashing = true;
-          player.dashTimeLeft = player.dashDuration;
-          // 눌렀을 때의 방향 벡터 고정
-          player.dashDirX = dx / distance;
-          player.dashDirY = dy / distance;
+    // W 키 뗐을 때 (돌진 실행)
+    window.addEventListener('keyup', (e) => {
+      if (e.key === 'w' || e.key === 'W') {
+        const now = Date.now();
+        const timePassed = now - player.lastDashTime;
+
+        // 쿨타임 검사 및 조건 충족 시 돌진
+        if (player.isCharging && timePassed >= player.cooldownTime && !player.isDashing) {
+          const dx = mouseX - player.x;
+          const dy = mouseY - player.y;
+          const distance = Math.hypot(dx, dy);
+
+          if (distance > 0) {
+            player.isDashing = true;
+            player.dashTimeLeft = player.dashDuration;
+            player.dashDirX = dx / distance;
+            player.dashDirY = dy / distance;
+            player.lastDashTime = now; // 쿨타임 갱신
+          }
         }
+        player.isCharging = false;
       }
     });
 
     function update() {
-      // 1. 돌진 중일 때
+      // 1. 돌진 처리
       if (player.isDashing) {
         player.x += player.dashDirX * player.dashSpeed;
         player.y += player.dashDirY * player.dashSpeed;
-        
+
         player.dashTimeLeft--;
         if (player.dashTimeLeft <= 0) {
-          player.isDashing = false; // 돌진 종료
+          player.isDashing = false;
         }
       } 
-      // 2. 일반 클릭 이동 중일 때
+      // 2. 일반 이동
       else {
         const dx = player.targetX - player.x;
         const dy = player.targetY - player.y;
@@ -117,6 +136,41 @@
       }
     }
 
+    // 화살표 그리기 함수
+    function drawArrow(fromX, fromY, toX, toY, color) {
+      const headLength = 10;
+      const dx = toX - fromX;
+      const dy = toY - fromY;
+      const angle = Math.atan2(dy, dx);
+
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 3;
+
+      // 화살표 줄기
+      ctx.beginPath();
+      ctx.moveTo(fromX, fromY);
+      ctx.lineTo(toX, toY);
+      ctx.stroke();
+
+      // 화살표 머리
+      ctx.beginPath();
+      ctx.moveTo(toX, toY);
+      ctx.lineTo(
+        toX - headLength * Math.cos(angle - Math.PI / 6),
+        toY - headLength * Math.sin(angle - Math.PI / 6)
+      );
+      ctx.lineTo(
+        toX - headLength * Math.cos(angle + Math.PI / 6),
+        toY - headLength * Math.sin(angle + Math.PI / 6)
+      );
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+    }
+
     function render() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -127,12 +181,43 @@
       ctx.fillStyle = dummy.headColor;
       ctx.fillRect(dummy.x - dummy.headWidth / 2, dummy.y - dummy.headHeight, dummy.headWidth, dummy.headHeight);
 
+      // 돌진 경로 화살표 표시 (W 누르는 동안)
+      if (player.isCharging) {
+        const dx = mouseX - player.x;
+        const dy = mouseY - player.y;
+        const distance = Math.hypot(dx, dy);
+
+        if (distance > 0) {
+          const totalDashDist = player.dashSpeed * player.dashDuration;
+          const targetArrowX = player.x + (dx / distance) * totalDashDist;
+          const targetArrowY = player.y + (dy / distance) * totalDashDist;
+
+          const now = Date.now();
+          const isReady = (now - player.lastDashTime) >= player.cooldownTime;
+          const arrowColor = isReady ? '#00FFCC' : '#FF4444'; // 준비 완료시 민트색, 쿨타임 중일 때 빨간색
+
+          drawArrow(player.x, player.y, targetArrowX, targetArrowY, arrowColor);
+        }
+      }
+
       // 플레이어 그리기
       ctx.beginPath();
       ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
       ctx.fillStyle = player.color;
       ctx.fill();
       ctx.closePath();
+
+      // UI: 돌진 쿨타임 텍스트 표시
+      const now = Date.now();
+      const cooldownRemaining = Math.max(0, (player.cooldownTime - (now - player.lastDashTime)) / 1000);
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '16px sans-serif';
+      if (cooldownRemaining > 0) {
+        ctx.fillText(`돌진 쿨타임: ${cooldownRemaining.toFixed(1)}초`, 20, 35);
+      } else {
+        ctx.fillText('돌진 준비 완료 (W 누르기)', 20, 35);
+      }
     }
 
     function loop() {
@@ -142,6 +227,9 @@
     }
 
     loop();
+  </script>
+</body>
+</html>
   </script>
 </body>
 </html>
