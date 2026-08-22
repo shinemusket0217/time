@@ -71,13 +71,13 @@
       isMouseDown = false;
     });
 
-    // 1. 더미 (원형 디자인)
+    // 1. 더미 (원형)
     const dummy = {
       x: canvas.width / 2 + 150,
       y: canvas.height / 2,
-      radius: 14,             // 원형 더미 반지름
-      bodyColor: '#FFFFE0',   // 아이보리색
-      headColor: '#558B2F',   // 짙은 연두색
+      radius: 14,
+      bodyColor: '#FFFFE0',
+      headColor: '#558B2F',
       vx: 0,
       vy: 0
     };
@@ -92,7 +92,7 @@
       color: '#FF69B4',
       speed: 10 / 3,
 
-      // W 돌진 & 광폭 자동 추적
+      // W 돌진 & 광폭
       isCharging: false,
       isDashing: false,
       dashSpeed: 10.5,
@@ -103,11 +103,11 @@
       cooldownTime: 13000,
       lastDashTime: 0,
 
-      // 광폭 자동 추적 및 W 평타 강화 시스템
+      // 광폭 자동 추적 및 강화 평타
       isAutoRunning: false,
       autoRunEndTime: 0,
-      wEmpowered: false,       // 평타 강화 켜짐 여부
-      wEmpoweredUsed: false,   // 광폭 동안 1회 사용 제한
+      wEmpowered: false,
+      wEmpoweredUsed: false,
 
       // Q 스킬
       isQCharging: false,
@@ -124,10 +124,10 @@
       qCooldownTime: 10000,
       lastQTime: 0,
 
-      // E 스킬 (차징 방향 고정)
+      // E 스킬
       isECharging: false,
       eChargeStart: 0,
-      eAngle: 0,               // 차징 시작 시 마우스 방향 고정
+      eAngle: 0,
       eMaxChargeTime: 900,
       eMinRange: 20,
       eMaxRange: 90,
@@ -135,7 +135,7 @@
       eCooldownTime: 8000,
       lastETime: 0,
 
-      // 평타 & 타겟팅
+      // 평타 & 타겟팅 & 정지 딜레이 제어
       isTargetingDummy: false,
       attackRange: 63 * (2 / 3),
       defaultAttackInterval: 1500,
@@ -143,13 +143,13 @@
       isInAttackRange: false,
       lastAttackTime: 0,
       hasSpawnedAoEThisCycle: false,
-      instantAttackScale: 0.075
+      instantAttackScale: 0.075,
+      stopDelayTimer: 0 // 사거리 접근 시 즉시 정지 방지용 유예 타이머
     };
 
     let playerScale = 1.0;
     let dummyScale = 1.0;
 
-    // 더미 마우스 오버 판정 (원형)
     function isMouseOverDummy() {
       const dist = Math.hypot(mouseX - dummy.x, mouseY - dummy.y);
       return dist <= dummy.radius + 8;
@@ -162,12 +162,11 @@
 
     window.addEventListener('keydown', (e) => {
       if ((e.key === 'w' || e.key === 'W') && !e.repeat && !player.isECharging) {
-        // 광폭 추적 중 W 입력 시 1회에 한해 '평타 강화' 버프 켜기 (평타 딜레이 캔슬)
         if (player.isAutoRunning && !player.isDashing && !player.isQJumping) {
           if (!player.wEmpoweredUsed) {
             player.wEmpowered = true;
             player.wEmpoweredUsed = true;
-            player.lastAttackTime = Date.now() - player.autoAttackInterval; // 즉시 평타 발동 캔슬
+            player.lastAttackTime = Date.now() - player.autoAttackInterval;
           }
           return;
         }
@@ -181,7 +180,6 @@
         player.isQCharging = true;
       }
 
-      // E 스킬 누를 때의 마우스 방향을 고정(eAngle)
       if ((e.key === 'e' || e.key === 'E') && !e.repeat && !player.isECharging) {
         const now = Date.now();
         const eTimePassed = now - player.lastETime;
@@ -191,7 +189,7 @@
 
           player.isECharging = true;
           player.eChargeStart = now;
-          player.eAngle = Math.atan2(mouseY - player.y, mouseX - player.x); // 차징 방향 고정
+          player.eAngle = Math.atan2(mouseY - player.y, mouseX - player.x);
 
           player.targetX = player.x;
           player.targetY = player.y;
@@ -247,7 +245,7 @@
         player.isQCharging = false;
       }
 
-      // E 스킬 (고정된 eAngle 방향으로 밀쳐내기 발동)
+      // E 스킬
       if (e.key === 'e' || e.key === 'E') {
         if (player.isECharging) {
           const chargedTime = now - player.eChargeStart;
@@ -255,7 +253,7 @@
 
           if (isFullCharged) {
             const currentLength = player.eMaxRange;
-            const angle = player.eAngle; // 차징 시작 시 고정된 방향 사용
+            const angle = player.eAngle;
 
             const dummyDx = dummy.x - player.x;
             const dummyDy = dummy.y - player.y;
@@ -287,7 +285,6 @@
       }
     });
 
-    // 원-원 충돌 처리
     function handleCollision() {
       const dx = player.x - dummy.x;
       const dy = player.y - dummy.y;
@@ -342,13 +339,20 @@
         const dy = dummy.y - player.y;
         const distToDummy = Math.hypot(dx, dy);
 
+        // 평타 사거리 외부에 있을 때: 사거리 안쪽 깊숙하게(attackRange - 6px) 목표 설정
         if (distToDummy > player.attackRange) {
-          player.targetX = dummy.x - (dx / distToDummy) * player.attackRange;
-          player.targetY = dummy.y - (dy / distToDummy) * player.attackRange;
+          player.targetX = dummy.x - (dx / distToDummy) * (player.attackRange - 6);
+          player.targetY = dummy.y - (dy / distToDummy) * (player.attackRange - 6);
           player.isInAttackRange = false;
+          player.stopDelayTimer = 5; // 접근 진입 시 5프레임 정지 유예 보장
         } else {
-          player.targetX = player.x;
-          player.targetY = player.y;
+          // 사거리 내부 진입 시 바로 딱 멈추지 않고, 약간의 딜레이(stopDelayTimer) 동안 접근 관성 유지
+          if (player.stopDelayTimer > 0) {
+            player.stopDelayTimer--;
+          } else {
+            player.targetX = player.x;
+            player.targetY = player.y;
+          }
           player.isInAttackRange = true;
         }
       } else {
@@ -357,13 +361,11 @@
 
       const currentAttackInterval = player.isAutoRunning ? player.autoAttackInterval : player.defaultAttackInterval;
 
-      // 평타 공격 시점 처리
       if (player.isInAttackRange && !player.isDashing && !player.isQJumping && !player.isECharging) {
         if (!player.lastAttackTime) player.lastAttackTime = now;
 
         const cycle = (now - player.lastAttackTime) % currentAttackInterval;
 
-        // 실제 평타 타격 순간
         if (player.isAutoRunning && cycle < 50 && !player.hasSpawnedAoEThisCycle) {
           const maxR = 45;
           const isEmpowered = player.wEmpowered;
@@ -374,12 +376,12 @@
             radius: maxR * 0.8,
             maxRadius: maxR,
             alpha: isEmpowered ? 0.9 : 0.7,
-            isRed: isEmpowered // 평타 강회가 활성화된 상태면 붉은색 이펙트 발동
+            isRed: isEmpowered
           });
 
           if (isEmpowered) {
-            player.instantAttackScale = 0.25; // 강화 평타 25% 크기 모션
-            player.wEmpowered = false;          // 강화 평타 소모
+            player.instantAttackScale = 0.25;
+            player.wEmpowered = false;
           } else {
             player.instantAttackScale = 0.075;
           }
@@ -410,7 +412,6 @@
         player.instantAttackScale = 0.075;
       }
 
-      // 바닥 원형 이펙트
       for (let i = aoeEffects.length - 1; i >= 0; i--) {
         const fx = aoeEffects[i];
         fx.radius += 2.5;
@@ -456,7 +457,7 @@
           player.isAutoRunning = true;
           player.autoRunEndTime = Date.now() + 8000;
           player.wEmpowered = false;
-          player.wEmpoweredUsed = false; // 광폭 진입 시 강화 평타 기회 초기화
+          player.wEmpoweredUsed = false;
         }
       } else if (!player.isECharging) {
         const dx = player.targetX - player.x;
@@ -609,7 +610,7 @@
         ctx.restore();
       }
 
-      // 원형 더미 그리기 (아이보리 몸통 + 상단 어두운 연두색 모자 포인트)
+      // 원형 더미그리기
       ctx.save();
       ctx.translate(dummy.x, dummy.y);
       ctx.scale(dummyScale, dummyScale);
@@ -619,7 +620,6 @@
       ctx.fillStyle = dummy.bodyColor;
       ctx.fill();
 
-      // 상단 어두운 연두색 헤드
       ctx.beginPath();
       ctx.arc(0, -3, dummy.radius * 0.65, Math.PI, Math.PI * 2);
       ctx.fillStyle = dummy.headColor;
@@ -650,7 +650,6 @@
         drawRangeCircle(player.x, player.y, player.qRange);
       }
 
-      // E 차징 영역 표시 (고정된 eAngle 사용)
       if (player.isECharging) {
         const chargedTime = Math.min(player.eMaxChargeTime, now - player.eChargeStart);
         const ratio = chargedTime / player.eMaxChargeTime;
@@ -660,7 +659,7 @@
 
         ctx.save();
         ctx.translate(player.x, player.y);
-        ctx.rotate(player.eAngle); // 고정 방향으로 그리기
+        ctx.rotate(player.eAngle);
 
         ctx.fillStyle = isFullCharged ? 'rgba(255, 20, 147, 0.35)' : 'rgba(0, 191, 255, 0.18)';
         ctx.strokeStyle = isFullCharged ? '#FF1493' : 'rgba(0, 191, 255, 0.6)';
@@ -686,7 +685,7 @@
       ctx.fillStyle = player.color;
       ctx.fill();
       if (player.isAutoRunning) {
-        ctx.strokeStyle = player.wEmpowered ? '#FF0000' : '#FF1493'; // 강화 상태 시 붉은 테두리 강조
+        ctx.strokeStyle = player.wEmpowered ? '#FF0000' : '#FF1493';
         ctx.lineWidth = player.wEmpowered ? 4 : 3;
         ctx.stroke();
       }
@@ -717,9 +716,6 @@
     }
 
     loop();
-  </script>
-</body>
-</html>
   </script>
 </body>
 </html>
