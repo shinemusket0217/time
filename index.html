@@ -31,15 +31,17 @@
     let mouseX = canvas.width / 2;
     let mouseY = canvas.height / 2;
     let isMouseDown = false;
-    let isInfiniteCooldown = false; // 무제한 쿨타임 토글 상태
+    let isInfiniteCooldown = false;
 
-    // 좌측 상단 초기화 버튼 (40x40)
     const resetBtn = { x: 20, y: 55, width: 40, height: 40 };
+
+    // 평타 이펙트 & E 사각형 충격파 이펙트 배열
+    const aoeEffects = [];
+    const knockbackRects = [];
 
     window.addEventListener('mousemove', (e) => {
       mouseX = e.clientX;
       mouseY = e.clientY;
-      // 자동 추적 중에는 마우스 이동 조종 불가
       if (isMouseDown && !player.isTargetingDummy && !player.isAutoRunning) {
         player.targetX = mouseX;
         player.targetY = mouseY;
@@ -47,19 +49,16 @@
     });
 
     window.addEventListener('mousedown', (e) => {
-      // 1. 모래시계 버튼 클릭 시 무제한 쿨타임 온/오프 토글
       if (e.clientX >= resetBtn.x && e.clientX <= resetBtn.x + resetBtn.width &&
           e.clientY >= resetBtn.y && e.clientY <= resetBtn.y + resetBtn.height) {
         isInfiniteCooldown = !isInfiniteCooldown;
         return;
       }
 
-      // 2. W 자동 추적(통제 불가) 상태일 때는 마우스 클릭 조작 무시
       if (player.isAutoRunning) return;
 
       isMouseDown = true;
 
-      // 더미 클릭 시 타겟팅
       if (isMouseOverDummy()) {
         player.isTargetingDummy = true;
       } else {
@@ -82,7 +81,9 @@
       headWidth: 20,
       headHeight: 16,
       bodyColor: '#FFFFE0',
-      headColor: '#558B2F'
+      headColor: '#558B2F',
+      vx: 0,
+      vy: 0
     };
 
     // 2. 플레이어 (핑크색 원)
@@ -95,7 +96,7 @@
       color: '#FF69B4',
       speed: 10 / 3,
 
-      // W 돌진 & 자동 추적 시스템
+      // W 돌진 & 자동 추적
       isCharging: false,
       isDashing: false,
       dashSpeed: 10.5,
@@ -106,11 +107,11 @@
       cooldownTime: 13000,
       lastDashTime: 0,
 
-      // W 후속 자동 추적 (8초간 이동/평타 통제 불가, Q는 가능)
+      // 광폭 자동 추적
       isAutoRunning: false,
       autoRunEndTime: 0,
 
-      // Q 스킬 시스템
+      // Q 스킬
       isQCharging: false,
       isQJumping: false,
       qRange: 112,
@@ -124,11 +125,22 @@
       qCooldownTime: 10000,
       lastQTime: 0,
 
+      // E 스킬 (직사각형 마우스 방향 밀쳐내기)
+      isECharging: false,
+      eChargeStart: 0,
+      eMaxChargeTime: 2000,
+      eMinRange: 40,
+      eMaxRange: 180,
+      eWidth: 50, // 사각형 너비
+      eCooldownTime: 8000,
+      lastETime: 0,
+
       // 평타 & 타겟팅
       isTargetingDummy: false,
       attackRange: 63 * (2 / 3),
       isInAttackRange: false,
-      lastAttackTime: 0
+      lastAttackTime: 0,
+      hasSpawnedAoEThisCycle: false
     };
 
     let playerScale = 1.0;
@@ -150,12 +162,23 @@
     }
 
     window.addEventListener('keydown', (e) => {
-      // 자동 추적 중에도 Q 조준 가능
       if ((e.key === 'w' || e.key === 'W') && !e.repeat && !player.isAutoRunning) {
         player.isCharging = true;
       }
       if ((e.key === 'q' || e.key === 'Q') && !e.repeat) {
         player.isQCharging = true;
+      }
+      // E 누르면 자동 추적 즉시 해제 및 E 차징 시작
+      if ((e.key === 'e' || e.key === 'E') && !e.repeat && !player.isECharging) {
+        const now = Date.now();
+        const eTimePassed = now - player.lastETime;
+        if (isInfiniteCooldown || eTimePassed >= player.eCooldownTime) {
+          player.isAutoRunning = false; // 자동 추적 해제
+          player.isTargetingDummy = false;
+
+          player.isECharging = true;
+          player.eChargeStart = now;
+        }
       }
     });
 
@@ -184,7 +207,7 @@
         player.isCharging = false;
       }
 
-      // Q 도약 (자동 추적 중에도 정상 사용 가능)
+      // Q 도약
       if (e.key === 'q' || e.key === 'Q') {
         const qTimePassed = now - player.lastQTime;
         const canUseQ = isInfiniteCooldown || (qTimePassed >= player.qCooldownTime);
@@ -199,6 +222,46 @@
           player.lastQTime = now;
         }
         player.isQCharging = false;
+      }
+
+      // E 마우스 방향 사각형 밀쳐내기
+      if (e.key === 'e' || e.key === 'E') {
+        if (player.isECharging) {
+          const chargedTime = Math.min(player.eMaxChargeTime, now - player.eChargeStart);
+          const ratio = chargedTime / player.eMaxChargeTime;
+          const currentLength = player.eMinRange + (player.eMaxRange - player.eMinRange) * ratio;
+
+          const dx = mouseX - player.x;
+          const dy = mouseY - player.y;
+          const angle = Math.atan2(dy, dx);
+
+          // 더미 좌표를 플레이어 기준 회전 좌표계로 변환하여 사각형 판정
+          const dummyDx = dummy.x - player.x;
+          const dummyDy = dummy.y - player.y;
+          const localX = dummyDx * Math.cos(-angle) - dummyDy * Math.sin(-angle);
+          const localY = dummyDx * Math.sin(-angle) + dummyDy * Math.cos(-angle);
+
+          // 사각형 내부 판정 (0 ~ currentLength, -eWidth/2 ~ eWidth/2)
+          if (localX >= 0 && localX <= currentLength && Math.abs(localY) <= player.eWidth / 2) {
+            const pushForce = 14 + ratio * 12;
+            const dist = Math.hypot(dx, dy) || 1;
+            dummy.vx = (dx / dist) * pushForce;
+            dummy.vy = (dy / dist) * pushForce;
+          }
+
+          // 자홍색 사각형 충격파 이펙트 등록
+          knockbackRects.push({
+            x: player.x,
+            y: player.y,
+            angle: angle,
+            width: player.eWidth,
+            length: currentLength,
+            alpha: 0.8
+          });
+
+          player.lastETime = now;
+          player.isECharging = false;
+        }
       }
     });
 
@@ -232,26 +295,31 @@
     function update() {
       const now = Date.now();
 
-      // 무제한 쿨타임 모드 시 시간 유지
       if (isInfiniteCooldown) {
         player.lastDashTime = 0;
         player.lastQTime = 0;
+        player.lastETime = 0;
       }
 
-      // 8초 자동 추적 타이머 체크
+      // 더미 넉백 물리 감속
+      dummy.x += dummy.vx;
+      dummy.y += dummy.vy;
+      dummy.vx *= 0.86;
+      dummy.vy *= 0.86;
+
+      // 8초 자동 추적 타이머
       if (player.isAutoRunning) {
         if (now > player.autoRunEndTime) {
           player.isAutoRunning = false;
           player.isTargetingDummy = false;
         } else {
-          player.isTargetingDummy = true; // 더미 강제 추적
+          player.isTargetingDummy = true;
         }
       }
 
-      // 이동 속도 결정 (자동 추적 시 20% 향상: speed * 1.2)
       const currentSpeed = player.isAutoRunning ? player.speed * 1.2 : player.speed;
 
-      // 1. 타겟팅 이동 계산
+      // 1. 타겟팅 이동
       if ((player.isTargetingDummy || player.isAutoRunning) && !player.isDashing && !player.isQJumping) {
         const dx = dummy.x - player.x;
         const dy = dummy.y - player.y;
@@ -270,11 +338,27 @@
         player.isInAttackRange = false;
       }
 
-      // 2. 평타 애니메이션
+      // 2. 평타 & 광폭 시 플레이어 주변 원형 자홍색 이펙트 발생
       if (player.isInAttackRange && !player.isDashing && !player.isQJumping) {
         if (!player.lastAttackTime) player.lastAttackTime = now;
 
         const cycle = (now - player.lastAttackTime) % 1000;
+
+        // 광폭 상태 타격 시 플레이어(player.x, player.y) 주변으로 원형 자홍색 이펙트 발생
+        if (player.isAutoRunning && cycle < 50 && !player.hasSpawnedAoEThisCycle) {
+          aoeEffects.push({
+            x: player.x,
+            y: player.y,
+            radius: 15,
+            maxRadius: 75,
+            alpha: 0.6
+          });
+          player.hasSpawnedAoEThisCycle = true;
+        }
+        if (cycle >= 50) {
+          player.hasSpawnedAoEThisCycle = false;
+        }
+
         if (cycle < 250) {
           const progress = cycle / 250;
           const pulse = Math.sin(progress * Math.PI);
@@ -286,8 +370,28 @@
         }
       } else {
         player.lastAttackTime = 0;
+        player.hasSpawnedAoEThisCycle = false;
         playerScale = 1.0;
         dummyScale = 1.0;
+      }
+
+      // 플레이어 주변 자홍색 파동 애니메이션
+      for (let i = aoeEffects.length - 1; i >= 0; i--) {
+        const fx = aoeEffects[i];
+        fx.radius += 2.5;
+        fx.alpha -= 0.025;
+        if (fx.alpha <= 0 || fx.radius >= fx.maxRadius) {
+          aoeEffects.splice(i, 1);
+        }
+      }
+
+      // E 사각형 자홍색 충격파 애니메이션
+      for (let i = knockbackRects.length - 1; i >= 0; i--) {
+        const rect = knockbackRects[i];
+        rect.alpha -= 0.04;
+        if (rect.alpha <= 0) {
+          knockbackRects.splice(i, 1);
+        }
       }
 
       // 3. 이동 처리
@@ -310,7 +414,6 @@
         player.y += player.dashDirY * player.dashSpeed;
 
         player.dashTimeLeft--;
-        // 돌진이 끝난 직후 8초간 자동 추적(광폭화) 상태 시작
         if (player.dashTimeLeft <= 0) {
           player.isDashing = false;
           player.isAutoRunning = true;
@@ -335,13 +438,13 @@
       }
     }
 
-    function drawRangeCircle(x, y, radius) {
+    function drawRangeCircle(x, y, radius, color = 'rgba(0, 191, 255, 0.18)', strokeColor = 'rgba(0, 191, 255, 0.5)') {
       ctx.save();
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(0, 191, 255, 0.18)';
+      ctx.fillStyle = color;
       ctx.fill();
-      ctx.strokeStyle = 'rgba(0, 191, 255, 0.5)';
+      ctx.strokeStyle = strokeColor;
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.restore();
@@ -373,7 +476,6 @@
       ctx.restore();
     }
 
-    // 모래시계 버튼 (ON 상태일 때 황금색 하이라이트)
     function drawHourglassButton() {
       ctx.save();
       ctx.fillStyle = isInfiniteCooldown ? 'rgba(255, 215, 0, 0.3)' : 'rgba(255, 255, 255, 0.15)';
@@ -423,7 +525,35 @@
       const qTimePassed = now - player.lastQTime;
       const isQReady = isInfiniteCooldown || (qTimePassed >= player.qCooldownTime);
 
-      // 더미 타겟 하이라이트
+      // 플레이어 주변 원형 자홍색 파동 이펙트
+      for (const fx of aoeEffects) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(fx.x, fx.y, fx.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 0, 255, ${fx.alpha * 0.3})`;
+        ctx.fill();
+        ctx.strokeStyle = `rgba(255, 20, 147, ${fx.alpha})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // E 사각형 자홍색 충격파 잔상
+      for (const rect of knockbackRects) {
+        ctx.save();
+        ctx.translate(rect.x, rect.y);
+        ctx.rotate(rect.angle);
+        ctx.fillStyle = `rgba(255, 0, 255, ${rect.alpha * 0.25})`;
+        ctx.strokeStyle = `rgba(255, 20, 147, ${rect.alpha})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.rect(0, -rect.width / 2, rect.length, rect.width);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 더미 하이라이트
       if (player.isQCharging && isMouseOverDummy() && isDummyInQRange()) {
         ctx.save();
         ctx.beginPath();
@@ -473,7 +603,34 @@
         drawRangeCircle(player.x, player.y, player.qRange);
       }
 
-      // 플레이어 위치 오프셋 (Q 점프 높이)
+      // E 차징 마우스 커서 방향 사각형 영역 표시 (자홍색)
+      if (player.isECharging) {
+        const chargedTime = Math.min(player.eMaxChargeTime, now - player.eChargeStart);
+        const ratio = chargedTime / player.eMaxChargeTime;
+        const currentLength = player.eMinRange + (player.eMaxRange - player.eMinRange) * ratio;
+
+        const dx = mouseX - player.x;
+        const dy = mouseY - player.y;
+        const angle = Math.atan2(dy, dx);
+
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        ctx.rotate(angle);
+
+        // 자홍색 채우기 및 테두리
+        ctx.fillStyle = 'rgba(255, 0, 255, 0.2)';
+        ctx.strokeStyle = '#FF1493';
+        ctx.lineWidth = 2;
+
+        ctx.beginPath();
+        ctx.rect(0, -player.eWidth / 2, currentLength, player.eWidth);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      // 플레이어 위치 오프셋
       let renderY = player.y;
       if (player.isQJumping) {
         const t = 1 - (player.qTimeLeft / player.qDuration);
@@ -481,32 +638,34 @@
         renderY -= arcOffset;
       }
 
-      // 플레이어 그리기 (자동 추적 중일 때 붉은 테두리 효과)
+      // 플레이어 그리기
       ctx.beginPath();
       ctx.arc(player.x, renderY, player.radius * playerScale, 0, Math.PI * 2);
       ctx.fillStyle = player.color;
       ctx.fill();
       if (player.isAutoRunning) {
-        ctx.strokeStyle = '#FF3333';
+        ctx.strokeStyle = '#FF1493';
         ctx.lineWidth = 3;
         ctx.stroke();
       }
       ctx.closePath();
 
-      // 버튼 및 UI
+      // UI
       drawHourglassButton();
 
       const wCooldownRemaining = Math.max(0, (player.cooldownTime - (now - player.lastDashTime)) / 1000);
       const qCooldownRemaining = Math.max(0, (player.qCooldownTime - (now - player.lastQTime)) / 1000);
+      const eCooldownRemaining = Math.max(0, (player.eCooldownTime - (now - player.lastETime)) / 1000);
 
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = '15px sans-serif';
+      ctx.font = '14px sans-serif';
 
-      const wText = isInfiniteCooldown ? 'W: 무제한' : (wCooldownRemaining > 0 ? `W: ${wCooldownRemaining.toFixed(1)}초` : 'W: 가능');
-      const qText = isInfiniteCooldown ? 'Q: 무제한' : (qCooldownRemaining > 0 ? `Q: ${qCooldownRemaining.toFixed(1)}초` : 'Q: 가능');
-      const statusText = player.isAutoRunning ? ` | [자동 추적 중: ${((player.autoRunEndTime - now)/1000).toFixed(1)}초]` : '';
+      const wText = isInfiniteCooldown ? 'W:무제한' : (wCooldownRemaining > 0 ? `W:${wCooldownRemaining.toFixed(1)}초` : 'W:가능');
+      const qText = isInfiniteCooldown ? 'Q:무제한' : (qCooldownRemaining > 0 ? `Q:${qCooldownRemaining.toFixed(1)}초` : 'Q:가능');
+      const eText = isInfiniteCooldown ? 'E:무제한' : (eCooldownRemaining > 0 ? `E:${eCooldownRemaining.toFixed(1)}초` : 'E:가능');
+      const statusText = player.isAutoRunning ? ` | [광폭 추적 중: ${((player.autoRunEndTime - now)/1000).toFixed(1)}초]` : '';
 
-      ctx.fillText(`${wText} | ${qText}${statusText}`, 20, 32);
+      ctx.fillText(`${wText} | ${qText} | ${eText}${statusText}`, 20, 32);
     }
 
     function loop() {
@@ -514,6 +673,11 @@
       render();
       requestAnimationFrame(loop);
     }
+
+    loop();
+  </script>
+</body>
+</html>
 
     loop();
   </script>
