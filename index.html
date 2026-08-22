@@ -2,153 +2,107 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>에임 트래킹 연습기</title>
+  <title>2D World Project</title>
   <style>
-    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #121212; color: white; margin: 0; padding: 20px; }
-    #info { display: flex; gap: 25px; font-size: 1.2rem; margin-bottom: 15px; font-weight: bold; }
-    canvas { background: #1e1e1e; border: 2px solid #333; border-radius: 8px; cursor: crosshair; }
-    .controls { margin-top: 15px; display: flex; gap: 12px; align-items: center; }
-    button { padding: 8px 18px; font-size: 1rem; cursor: pointer; border: none; background: #00e676; color: #121212; font-weight: bold; border-radius: 4px; }
-    button:hover { background: #00c853; }
-    select { padding: 6px; font-size: 0.95rem; border-radius: 4px; background: #222; color: #fff; border: 1px solid #444; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #222222; /* 배경색 */
+    }
+    canvas {
+      display: block;
+    }
   </style>
 </head>
 <body>
-  <h1>🎯 에임 트래킹 연습기</h1>
-  <div id="info">
-    <div>시간: <span id="time">30</span>s</div>
-    <div>점수: <span id="score">0</span></div>
-    <div>정확도: <span id="accuracy">0</span>%</div>
-  </div>
-  <canvas id="gameCanvas" width="800" height="500"></canvas>
-  <div class="controls">
-    <button id="startBtn" onclick="startGame()">게임 시작</button>
-    <label for="difficulty">난이도: </label>
-    <select id="difficulty">
-      <option value="easy">쉬움 (크고 느림)</option>
-      <option value="normal" selected>보통</option>
-      <option value="hard">어려움 (작고 빠름)</option>
-    </select>
-  </div>
+  <canvas id="world"></canvas>
 
   <script>
-    const canvas = document.getElementById('gameCanvas');
+    const canvas = document.getElementById('world');
     const ctx = canvas.getContext('2d');
-    const timeEl = document.getElementById('time');
-    const scoreEl = document.getElementById('score');
-    const accuracyEl = document.getElementById('accuracy');
 
-    let isPlaying = false, score = 0, totalFrames = 0, trackedFrames = 0, timeLeft = 30;
-    let timerInterval = null, animId = null;
-    let mouse = { x: -100, y: -100 };
-    let target = { x: 400, y: 250, radius: 25, vx: 3, vy: 3, baseSpeed: 5, changeDirTimer: 0 };
+    // 화면 크기 재설정
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
 
-    canvas.addEventListener('mousemove', (e) => {
-      const rect = canvas.getBoundingClientRect();
-      mouse.x = e.clientX - rect.left;
-      mouse.y = e.clientY - rect.top;
+    // 1. 더미 (허수아비)
+    const dummy = {
+      x: canvas.width / 2 + 150,
+      y: canvas.height / 2,
+      bodyWidth: 20,
+      bodyHeight: 30,
+      headWidth: 16,
+      headHeight: 16,
+      bodyColor: '#FFFFE0', // 아이보리색
+      headColor: '#2F4F4F'  // 살짝 어두운 초록색
+    };
+
+    // 2. 플레이어 (핑크색 원)
+    const player = {
+      x: canvas.width / 2 - 150,
+      y: canvas.height / 2,
+      targetX: canvas.width / 2 - 150,
+      targetY: canvas.height / 2,
+      radius: 15,
+      color: '#FF69B4', // 핑크색
+      speed: 5
+    };
+
+    // 마우스 클릭 시 목표 지점 갱신 (이동 중 클릭해도 새로운 위치로 즉시 재지정)
+    window.addEventListener('click', (e) => {
+      player.targetX = e.clientX;
+      player.targetY = e.clientY;
     });
 
-    function setDifficulty() {
-      const diff = document.getElementById('difficulty').value;
-      if (diff === 'easy') { target.radius = 35; target.baseSpeed = 3.5; }
-      else if (diff === 'normal') { target.radius = 24; target.baseSpeed = 5.5; }
-      else { target.radius = 16; target.baseSpeed = 8.5; }
-    }
+    // 프레임 업데이트 Logic
+    function update() {
+      const dx = player.targetX - player.x;
+      const dy = player.targetY - player.y;
+      const distance = Math.hypot(dx, dy);
 
-    function startGame() {
-      setDifficulty();
-      score = 0; totalFrames = 0; trackedFrames = 0; timeLeft = 30;
-      isPlaying = true;
-      document.getElementById('startBtn').disabled = true;
-
-      target.x = canvas.width / 2;
-      target.y = canvas.height / 2;
-      let angle = Math.random() * Math.PI * 2;
-      target.vx = Math.cos(angle) * target.baseSpeed;
-      target.vy = Math.sin(angle) * target.baseSpeed;
-
-      if (timerInterval) clearInterval(timerInterval);
-      timerInterval = setInterval(() => {
-        timeLeft--;
-        timeEl.innerText = timeLeft;
-        if (timeLeft <= 0) endGame();
-      }, 1000);
-
-      if (animId) cancelAnimationFrame(animId);
-      gameLoop();
-    }
-
-    function endGame() {
-      isPlaying = false;
-      clearInterval(timerInterval);
-      cancelAnimationFrame(animId);
-      document.getElementById('startBtn').disabled = false;
-      alert(`시간 종료!\n최종 점수: ${score}\n트래킹 정확도: ${accuracyEl.innerText}%`);
-    }
-
-    function updateTarget() {
-      target.x += target.vx;
-      target.y += target.vy;
-
-      if (target.x - target.radius < 0 || target.x + target.radius > canvas.width) {
-        target.vx *= -1;
-        target.x = Math.max(target.radius, Math.min(canvas.width - target.radius, target.x));
-      }
-      if (target.y - target.radius < 0 || target.y + target.radius > canvas.height) {
-        target.vy *= -1;
-        target.y = Math.max(target.radius, Math.min(canvas.height - target.radius, target.y));
-      }
-
-      target.changeDirTimer++;
-      if (target.changeDirTimer > 35) {
-        if (Math.random() < 0.4) {
-          let currentAngle = Math.atan2(target.vy, target.vx);
-          let newAngle = currentAngle + (Math.random() - 0.5) * 1.5;
-          target.vx = Math.cos(newAngle) * target.baseSpeed;
-          target.vy = Math.sin(newAngle) * target.baseSpeed;
-        }
-        target.changeDirTimer = 0;
+      // 목표 지점과의 거리가 속도보다 크면 계속 이동
+      if (distance > player.speed) {
+        player.x += (dx / distance) * player.speed;
+        player.y += (dy / distance) * player.speed;
+      } else {
+        // 목표 근처에 도착하면 정지
+        player.x = player.targetX;
+        player.y = player.targetY;
       }
     }
 
-    function gameLoop() {
-      if (!isPlaying) return;
-
-      totalFrames++;
-      updateTarget();
-
-      const dist = Math.hypot(mouse.x - target.x, mouse.y - target.y);
-      const isTracking = dist <= target.radius;
-
-      if (isTracking) {
-        score += 10;
-        trackedFrames++;
-      }
-
-      scoreEl.innerText = score;
-      const acc = totalFrames > 0 ? ((trackedFrames / totalFrames) * 100).toFixed(1) : 0;
-      accuracyEl.innerText = acc;
-
+    // 화면 그리기
+    function render() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 타겟 그리기
-      ctx.beginPath();
-      ctx.arc(target.x, target.y, target.radius, 0, Math.PI * 2);
-      ctx.fillStyle = isTracking ? '#00e676' : '#ff5252';
-      ctx.fill();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '#ffffff';
-      ctx.stroke();
+      // 더미 그리기
+      // 몸통 (아이보리 사각형)
+      ctx.fillStyle = dummy.bodyColor;
+      ctx.fillRect(dummy.x - dummy.bodyWidth / 2, dummy.y, dummy.bodyWidth, dummy.bodyHeight);
+      // 머리 (어두운 초록 사각형)
+      ctx.fillStyle = dummy.headColor;
+      ctx.fillRect(dummy.x - dummy.headWidth / 2, dummy.y - dummy.headHeight, dummy.headWidth, dummy.headHeight);
 
-      // 마우스 에임 조준선 피드백
+      // 플레이어 그리기 (핑크색 원)
       ctx.beginPath();
-      ctx.arc(mouse.x, mouse.y, 4, 0, Math.PI * 2);
-      ctx.fillStyle = isTracking ? '#00e676' : '#ffffff';
+      ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+      ctx.fillStyle = player.color;
       ctx.fill();
-
-      animId = requestAnimationFrame(gameLoop);
+      ctx.closePath();
     }
+
+    // 메인 메인 루프
+    function loop() {
+      update();
+      render();
+      requestAnimationFrame(loop);
+    }
+
+    loop();
   </script>
 </body>
 </html>
