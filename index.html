@@ -32,6 +32,9 @@
     let mouseY = canvas.height / 2;
     let isMouseDown = false;
 
+    // 좌측 상단 초기화 버튼 좌표 및 크기
+    const resetBtn = { x: 20, y: 55, width: 40, height: 40 };
+
     window.addEventListener('mousemove', (e) => {
       mouseX = e.clientX;
       mouseY = e.clientY;
@@ -42,6 +45,14 @@
     });
 
     window.addEventListener('mousedown', (e) => {
+      // 모래시계 버튼 클릭 시 쿨타임 초기화 (이동 좌표 지정 방지)
+      if (e.clientX >= resetBtn.x && e.clientX <= resetBtn.x + resetBtn.width &&
+          e.clientY >= resetBtn.y && e.clientY <= resetBtn.y + resetBtn.height) {
+        player.lastDashTime = 0;
+        player.lastQTime = 0;
+        return;
+      }
+
       isMouseDown = true;
       player.targetX = e.clientX;
       player.targetY = e.clientY;
@@ -73,7 +84,7 @@
       color: '#FF69B4',
       speed: 10 / 3,
 
-      // W 돌진 시스템 (속도 30% 감속: 15 -> 10.5)
+      // W 돌진 시스템
       isCharging: false,
       isDashing: false,
       dashSpeed: 10.5,
@@ -81,25 +92,24 @@
       dashTimeLeft: 0,
       dashDirX: 0,
       dashDirY: 0,
+      cooldownTime: 13000,
+      lastDashTime: 0,
 
       // Q 스킬 시스템 (포물선 도약)
       isQCharging: false,
       isQJumping: false,
-      qRange: 140,            // 돌진 거리(63px)보다 넓은 범위
-      qDuration: 18,         // 점프 시간 (프레임)
+      qRange: 140,
+      qDuration: 18,
       qTimeLeft: 0,
       qStartX: 0,
       qStartY: 0,
       qTargetX: 0,
       qTargetY: 0,
-      qArcMax: 30,           // 포물선 피크 높이 (과하지 않은 굴곡)
-
-      // 쿨타임 시스템
-      cooldownTime: 13000,
-      lastDashTime: 0
+      qArcMax: 30,
+      qCooldownTime: 10000, // Q 스킬 쿨타임: 10초
+      lastQTime: 0
     };
 
-    // 더미 위 마우스 호버 여부 확인
     function isMouseOverDummy() {
       const box = {
         minX: dummy.x - dummy.bodyWidth / 2 - 8,
@@ -110,13 +120,11 @@
       return mouseX >= box.minX && mouseX <= box.maxX && mouseY >= box.minY && mouseY <= box.maxY;
     }
 
-    // 더미가 Q 사거리 내에 있는지 확인
     function isDummyInQRange() {
       const dist = Math.hypot(dummy.x - player.x, dummy.y - player.y);
       return dist <= player.qRange;
     }
 
-    // 키보드 입력 처리
     window.addEventListener('keydown', (e) => {
       if ((e.key === 'w' || e.key === 'W') && !e.repeat) {
         player.isCharging = true;
@@ -127,9 +135,10 @@
     });
 
     window.addEventListener('keyup', (e) => {
+      const now = Date.now();
+
       // W 돌진 실행
       if (e.key === 'w' || e.key === 'W') {
-        const now = Date.now();
         const timePassed = now - player.lastDashTime;
 
         if (player.isCharging && timePassed >= player.cooldownTime && !player.isDashing && !player.isQJumping) {
@@ -150,19 +159,21 @@
 
       // Q 도약 실행
       if (e.key === 'q' || e.key === 'Q') {
-        if (player.isQCharging && isMouseOverDummy() && isDummyInQRange() && !player.isDashing && !player.isQJumping) {
+        const qTimePassed = now - player.lastQTime;
+
+        if (player.isQCharging && isMouseOverDummy() && isDummyInQRange() && qTimePassed >= player.qCooldownTime && !player.isDashing && !player.isQJumping) {
           player.isQJumping = true;
           player.qTimeLeft = player.qDuration;
           player.qStartX = player.x;
           player.qStartY = player.y;
           player.qTargetX = dummy.x;
           player.qTargetY = dummy.y;
+          player.lastQTime = now;
         }
         player.isQCharging = false;
       }
     });
 
-    // 충돌 처리 (미끄러짐)
     function handleCollision() {
       const box = {
         minX: dummy.x - dummy.bodyWidth / 2,
@@ -196,10 +207,9 @@
         player.targetY = mouseY;
       }
 
-      // 1. Q 포물선 도약 이동
       if (player.isQJumping) {
         player.qTimeLeft--;
-        const t = 1 - (player.qTimeLeft / player.qDuration); // 0 -> 1
+        const t = 1 - (player.qTimeLeft / player.qDuration);
 
         player.x = player.qStartX + (player.qTargetX - player.qStartX) * t;
         player.y = player.qStartY + (player.qTargetY - player.qStartY) * t;
@@ -211,9 +221,7 @@
             player.targetY = player.y;
           }
         }
-      }
-      // 2. W 직진 돌진 이동
-      else if (player.isDashing) {
+      } else if (player.isDashing) {
         player.x += player.dashDirX * player.dashSpeed;
         player.y += player.dashDirY * player.dashSpeed;
 
@@ -225,9 +233,7 @@
             player.targetY = player.y;
           }
         }
-      } 
-      // 3. 일반 클릭 이동
-      else {
+      } else {
         const dx = player.targetX - player.x;
         const dy = player.targetY - player.y;
         const distance = Math.hypot(dx, dy);
@@ -241,18 +247,16 @@
         }
       }
 
-      // 돌진 및 점프 상태가 아닐 때만 충돌 적용
       if (!player.isDashing && !player.isQJumping) {
         handleCollision();
       }
     }
 
-    // 범위 표시용 원 그리기
     function drawRangeCircle(x, y, radius) {
       ctx.save();
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(0, 191, 255, 0.18)'; // 투명도 높은 하늘색
+      ctx.fillStyle = 'rgba(0, 191, 255, 0.18)';
       ctx.fill();
       ctx.strokeStyle = 'rgba(0, 191, 255, 0.5)';
       ctx.lineWidth = 1.5;
@@ -260,7 +264,6 @@
       ctx.restore();
     }
 
-    // 화살표 그리기
     function drawArrow(fromX, fromY, toX, toY, color) {
       const headLength = 10;
       const dx = toX - fromX;
@@ -287,17 +290,64 @@
       ctx.restore();
     }
 
+    // 모래시계 버튼 그리기
+    function drawHourglassButton() {
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.lineWidth = 1.5;
+
+      ctx.beginPath();
+      ctx.rect(resetBtn.x, resetBtn.y, resetBtn.width, resetBtn.height);
+      ctx.fill();
+      ctx.stroke();
+
+      const cx = resetBtn.x + resetBtn.width / 2;
+      const cy = resetBtn.y + resetBtn.height / 2;
+      const size = 8;
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.beginPath();
+      ctx.moveTo(cx - size, cy - size);
+      ctx.lineTo(cx + size, cy - size);
+      ctx.lineTo(cx, cy);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(cx - size, cy + size);
+      ctx.lineTo(cx + size, cy + size);
+      ctx.lineTo(cx, cy);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - size, cy - size);
+      ctx.lineTo(cx + size, cy - size);
+      ctx.moveTo(cx - size, cy + size);
+      ctx.lineTo(cx + size, cy + size);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
     function render() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 더미 타겟팅 하이라이트 (Q 누르는 중 더미에 마우스 오버 시)
+      const now = Date.now();
+      const qTimePassed = now - player.lastQTime;
+      const isQReady = qTimePassed >= player.qCooldownTime;
+
+      // 더미 하이라이트
       if (player.isQCharging && isMouseOverDummy() && isDummyInQRange()) {
         ctx.save();
         ctx.beginPath();
         ctx.arc(dummy.x, dummy.y + 7, 24, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
+        ctx.fillStyle = isQReady ? 'rgba(255, 215, 0, 0.3)' : 'rgba(255, 68, 68, 0.3)';
         ctx.fill();
-        ctx.strokeStyle = '#FFD700';
+        ctx.strokeStyle = isQReady ? '#FFD700' : '#FF4444';
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.restore();
@@ -310,7 +360,7 @@
       ctx.fillStyle = dummy.headColor;
       ctx.fillRect(dummy.x - dummy.headWidth / 2, dummy.y - dummy.headHeight, dummy.headWidth, dummy.headHeight);
 
-      // W 범위 & 화살표 표시
+      // W 조준 표시
       if (player.isCharging) {
         const wDist = player.dashSpeed * player.dashDuration;
         drawRangeCircle(player.x, player.y, wDist);
@@ -323,7 +373,6 @@
           const targetArrowX = player.x + (dx / distance) * wDist;
           const targetArrowY = player.y + (dy / distance) * wDist;
 
-          const now = Date.now();
           const isReady = (now - player.lastDashTime) >= player.cooldownTime;
           const arrowColor = isReady ? '#00FFCC' : '#FF4444';
 
@@ -331,16 +380,16 @@
         }
       }
 
-      // Q 범위 표시 (대상이 없거나 Q 누르는 동안)
+      // Q 조준 표시
       if (player.isQCharging) {
         drawRangeCircle(player.x, player.y, player.qRange);
       }
 
-      // 플레이어 위치 계산 (Q 포물선 점프 시 시각적 높이 적용)
+      // 플레이어 위치 오프셋 (Q 도약 시 높이 계산)
       let renderY = player.y;
       if (player.isQJumping) {
         const t = 1 - (player.qTimeLeft / player.qDuration);
-        const arcOffset = 4 * player.qArcMax * t * (1 - t); // 2D 상단 시점 높이 오프셋
+        const arcOffset = 4 * player.qArcMax * t * (1 - t);
         renderY -= arcOffset;
       }
 
@@ -351,17 +400,20 @@
       ctx.fill();
       ctx.closePath();
 
-      // UI
-      const now = Date.now();
-      const cooldownRemaining = Math.max(0, (player.cooldownTime - (now - player.lastDashTime)) / 1000);
+      // 반투명 모래시계 버튼
+      drawHourglassButton();
+
+      // UI 쿨타임 표시
+      const wCooldownRemaining = Math.max(0, (player.cooldownTime - (now - player.lastDashTime)) / 1000);
+      const qCooldownRemaining = Math.max(0, (player.qCooldownTime - (now - player.lastQTime)) / 1000);
 
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = '16px sans-serif';
-      if (cooldownRemaining > 0) {
-        ctx.fillText(`W 쿨타임: ${cooldownRemaining.toFixed(1)}초 | Q: 대상 클릭 도약`, 20, 35);
-      } else {
-        ctx.fillText('W: 돌진 준비 완료 | Q: 대상 클릭 도약', 20, 35);
-      }
+      ctx.font = '15px sans-serif';
+
+      const wText = wCooldownRemaining > 0 ? `W: ${wCooldownRemaining.toFixed(1)}초` : 'W: 가능';
+      const qText = qCooldownRemaining > 0 ? `Q: ${qCooldownRemaining.toFixed(1)}초` : 'Q: 가능';
+
+      ctx.fillText(`${wText} | ${qText}`, 20, 32);
     }
 
     function loop() {
