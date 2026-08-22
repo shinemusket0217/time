@@ -32,20 +32,20 @@
     let mouseY = canvas.height / 2;
     let isMouseDown = false;
 
-    // 좌측 상단 초기화 버튼 좌표 및 크기
+    // 좌측 상단 초기화 버튼
     const resetBtn = { x: 20, y: 55, width: 40, height: 40 };
 
     window.addEventListener('mousemove', (e) => {
       mouseX = e.clientX;
       mouseY = e.clientY;
-      if (isMouseDown) {
+      if (isMouseDown && !player.isTargetingDummy) {
         player.targetX = mouseX;
         player.targetY = mouseY;
       }
     });
 
     window.addEventListener('mousedown', (e) => {
-      // 모래시계 버튼 클릭 시 쿨타임 초기화 (이동 좌표 지정 방지)
+      // 쿨타임 초기화 버튼 클릭
       if (e.clientX >= resetBtn.x && e.clientX <= resetBtn.x + resetBtn.width &&
           e.clientY >= resetBtn.y && e.clientY <= resetBtn.y + resetBtn.height) {
         player.lastDashTime = 0;
@@ -54,8 +54,15 @@
       }
 
       isMouseDown = true;
-      player.targetX = e.clientX;
-      player.targetY = e.clientY;
+
+      // 더미 클릭 시 타겟팅 설정
+      if (isMouseOverDummy()) {
+        player.isTargetingDummy = true;
+      } else {
+        player.isTargetingDummy = false;
+        player.targetX = e.clientX;
+        player.targetY = e.clientY;
+      }
     });
 
     window.addEventListener('mouseup', () => {
@@ -84,7 +91,7 @@
       color: '#FF69B4',
       speed: 10 / 3,
 
-      // W 돌진 시스템
+      // W 돌진 시스템 (거리 = 10.5 * 6 = 63px)
       isCharging: false,
       isDashing: false,
       dashSpeed: 10.5,
@@ -95,10 +102,10 @@
       cooldownTime: 13000,
       lastDashTime: 0,
 
-      // Q 스킬 시스템 (포물선 도약)
+      // Q 스킬 시스템 (사거리 4/5로 변경: 140 -> 112)
       isQCharging: false,
       isQJumping: false,
-      qRange: 140,
+      qRange: 112,
       qDuration: 18,
       qTimeLeft: 0,
       qStartX: 0,
@@ -106,9 +113,19 @@
       qTargetX: 0,
       qTargetY: 0,
       qArcMax: 30,
-      qCooldownTime: 10000, // Q 스킬 쿨타임: 10초
-      lastQTime: 0
+      qCooldownTime: 10000,
+      lastQTime: 0,
+
+      // 평타 & 타겟팅 시스템
+      isTargetingDummy: false,
+      attackRange: 63 * (2 / 3), // W 거리의 2/3 (42px)
+      isInAttackRange: false,
+      lastAttackTime: 0
     };
+
+    // 더미 스케일 애니메이션 값 (기본 1.0)
+    let playerScale = 1.0;
+    let dummyScale = 1.0;
 
     function isMouseOverDummy() {
       const box = {
@@ -137,7 +154,7 @@
     window.addEventListener('keyup', (e) => {
       const now = Date.now();
 
-      // W 돌진 실행
+      // W 돌진
       if (e.key === 'w' || e.key === 'W') {
         const timePassed = now - player.lastDashTime;
 
@@ -152,12 +169,13 @@
             player.dashDirX = dx / distance;
             player.dashDirY = dy / distance;
             player.lastDashTime = now;
+            player.isTargetingDummy = false;
           }
         }
         player.isCharging = false;
       }
 
-      // Q 도약 실행
+      // Q 도약
       if (e.key === 'q' || e.key === 'Q') {
         const qTimePassed = now - player.lastQTime;
 
@@ -169,6 +187,7 @@
           player.qTargetX = dummy.x;
           player.qTargetY = dummy.y;
           player.lastQTime = now;
+          player.isTargetingDummy = false;
         }
         player.isQCharging = false;
       }
@@ -202,11 +221,48 @@
     }
 
     function update() {
-      if (isMouseDown) {
-        player.targetX = mouseX;
-        player.targetY = mouseY;
+      // 1. 더미 타겟팅 이동 로직
+      if (player.isTargetingDummy && !player.isDashing && !player.isQJumping) {
+        const dx = dummy.x - player.x;
+        const dy = dummy.y - player.y;
+        const distToDummy = Math.hypot(dx, dy);
+
+        if (distToDummy > player.attackRange) {
+          // W 거리의 2/3 지점까지만 접근
+          player.targetX = dummy.x - (dx / distToDummy) * player.attackRange;
+          player.targetY = dummy.y - (dy / distToDummy) * player.attackRange;
+          player.isInAttackRange = false;
+        } else {
+          player.targetX = player.x;
+          player.targetY = player.y;
+          player.isInAttackRange = true;
+        }
+      } else {
+        player.isInAttackRange = false;
       }
 
+      // 2. 평타 모션 애니메이션 (1초 주기)
+      if (player.isInAttackRange && !player.isDashing && !player.isQJumping) {
+        const now = Date.now();
+        if (!player.lastAttackTime) player.lastAttackTime = now;
+
+        const cycle = (now - player.lastAttackTime) % 1000;
+        if (cycle < 250) { // 매초 전반부 250ms 동안 타격 피드백
+          const progress = cycle / 250;
+          const pulse = Math.sin(progress * Math.PI);
+          playerScale = 1 + pulse * 0.15; // 핑크 원: 커졌다 작아짐
+          dummyScale = 1 - pulse * 0.15;  // 더미: 피격 시 작아졌다 커짐
+        } else {
+          playerScale = 1.0;
+          dummyScale = 1.0;
+        }
+      } else {
+        player.lastAttackTime = 0;
+        playerScale = 1.0;
+        dummyScale = 1.0;
+      }
+
+      // 3. 이동 및 도약 업데이트
       if (player.isQJumping) {
         player.qTimeLeft--;
         const t = 1 - (player.qTimeLeft / player.qDuration);
@@ -290,7 +346,6 @@
       ctx.restore();
     }
 
-    // 모래시계 버튼 그리기
     function drawHourglassButton() {
       ctx.save();
       ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
@@ -353,12 +408,17 @@
         ctx.restore();
       }
 
-      // 더미 그리기
+      // 더미 그리기 (피격 스케일 적용)
+      ctx.save();
+      ctx.translate(dummy.x, dummy.y + 7);
+      ctx.scale(dummyScale, dummyScale);
+
       ctx.fillStyle = dummy.bodyColor;
-      ctx.fillRect(dummy.x - dummy.bodyWidth / 2, dummy.y, dummy.bodyWidth, dummy.bodyHeight);
+      ctx.fillRect(-dummy.bodyWidth / 2, -7, dummy.bodyWidth, dummy.bodyHeight);
 
       ctx.fillStyle = dummy.headColor;
-      ctx.fillRect(dummy.x - dummy.headWidth / 2, dummy.y - dummy.headHeight, dummy.headWidth, dummy.headHeight);
+      ctx.fillRect(-dummy.headWidth / 2, -7 - dummy.headHeight, dummy.headWidth, dummy.headHeight);
+      ctx.restore();
 
       // W 조준 표시
       if (player.isCharging) {
@@ -380,12 +440,12 @@
         }
       }
 
-      // Q 조준 표시
+      // Q 조준 표시 (줄어든 사거리 112px 적용)
       if (player.isQCharging) {
         drawRangeCircle(player.x, player.y, player.qRange);
       }
 
-      // 플레이어 위치 오프셋 (Q 도약 시 높이 계산)
+      // 플레이어 오프셋 계산 (Q 점프 높이)
       let renderY = player.y;
       if (player.isQJumping) {
         const t = 1 - (player.qTimeLeft / player.qDuration);
@@ -393,17 +453,16 @@
         renderY -= arcOffset;
       }
 
-      // 플레이어 그리기
+      // 플레이어 그리기 (평타 스케일 적용)
       ctx.beginPath();
-      ctx.arc(player.x, renderY, player.radius, 0, Math.PI * 2);
+      ctx.arc(player.x, renderY, player.radius * playerScale, 0, Math.PI * 2);
       ctx.fillStyle = player.color;
       ctx.fill();
       ctx.closePath();
 
-      // 반투명 모래시계 버튼
+      // UI
       drawHourglassButton();
 
-      // UI 쿨타임 표시
       const wCooldownRemaining = Math.max(0, (player.cooldownTime - (now - player.lastDashTime)) / 1000);
       const qCooldownRemaining = Math.max(0, (player.qCooldownTime - (now - player.lastQTime)) / 1000);
 
