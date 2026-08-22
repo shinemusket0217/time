@@ -28,7 +28,6 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // 마우스 좌표 실시간 추적
     let mouseX = canvas.width / 2;
     let mouseY = canvas.height / 2;
 
@@ -57,46 +56,64 @@
       targetY: canvas.height / 2,
       radius: 15,
       color: '#FF69B4',
-      speed: 10 / 3,      // 속도 2배 증가 (~3.33)
-      dashDistance: 70   // W키 돌진 거리 (픽셀)
+      speed: 10 / 3,        // 기본 이동 속도
+      
+      // 돌진 시스템 속성
+      isDashing: false,
+      dashSpeed: 15,        // 돌진 속도 (기본 속도의 약 4.5배)
+      dashDuration: 12,     // 돌진 지속 프레임 수
+      dashTimeLeft: 0,      // 남은 돌진 프레임
+      dashDirX: 0,          // 돌진 고정 방향 X
+      dashDirY: 0           // 돌진 고정 방향 Y
     };
 
-    // 마우스 클릭 시 목표 지점 이동
+    // 마우스 클릭 시 목표 지점 변경
     window.addEventListener('click', (e) => {
       player.targetX = e.clientX;
       player.targetY = e.clientY;
     });
 
-    // W키 누를 때 마우스 방향으로 돌진
+    // W키 누를 때 돌진 시작
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'w' || e.key === 'W') {
+      if ((e.key === 'w' || e.key === 'W') && !player.isDashing) {
         const dx = mouseX - player.x;
         const dy = mouseY - player.y;
         const distance = Math.hypot(dx, dy);
 
         if (distance > 0) {
-          // 마우스 방향으로 돌진 거리만큼 순간 이동
-          player.x += (dx / distance) * player.dashDistance;
-          player.y += (dy / distance) * player.dashDistance;
-          
-          // 돌진 후 목표 지점을 현재 위치로 재설정 (기존 이동 경로 초기화)
-          player.targetX = player.x;
-          player.targetY = player.y;
+          player.isDashing = true;
+          player.dashTimeLeft = player.dashDuration;
+          // 눌렀을 때의 방향 벡터 고정
+          player.dashDirX = dx / distance;
+          player.dashDirY = dy / distance;
         }
       }
     });
 
     function update() {
-      const dx = player.targetX - player.x;
-      const dy = player.targetY - player.y;
-      const distance = Math.hypot(dx, dy);
+      // 1. 돌진 중일 때
+      if (player.isDashing) {
+        player.x += player.dashDirX * player.dashSpeed;
+        player.y += player.dashDirY * player.dashSpeed;
+        
+        player.dashTimeLeft--;
+        if (player.dashTimeLeft <= 0) {
+          player.isDashing = false; // 돌진 종료
+        }
+      } 
+      // 2. 일반 클릭 이동 중일 때
+      else {
+        const dx = player.targetX - player.x;
+        const dy = player.targetY - player.y;
+        const distance = Math.hypot(dx, dy);
 
-      if (distance > player.speed) {
-        player.x += (dx / distance) * player.speed;
-        player.y += (dy / distance) * player.speed;
-      } else {
-        player.x = player.targetX;
-        player.y = player.targetY;
+        if (distance > player.speed) {
+          player.x += (dx / distance) * player.speed;
+          player.y += (dy / distance) * player.speed;
+        } else {
+          player.x = player.targetX;
+          player.y = player.targetY;
+        }
       }
     }
 
