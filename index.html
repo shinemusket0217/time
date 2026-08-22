@@ -71,16 +71,13 @@
       isMouseDown = false;
     });
 
-    // 1. 더미 (24x24 정사각형)
+    // 1. 더미 (원형 디자인)
     const dummy = {
       x: canvas.width / 2 + 150,
       y: canvas.height / 2,
-      bodyWidth: 24,
-      bodyHeight: 14,
-      headWidth: 24,
-      headHeight: 10,
-      bodyColor: '#FFFFE0',
-      headColor: '#558B2F',
+      radius: 14,             // 원형 더미 반지름
+      bodyColor: '#FFFFE0',   // 아이보리색
+      headColor: '#558B2F',   // 짙은 연두색
       vx: 0,
       vy: 0
     };
@@ -106,9 +103,11 @@
       cooldownTime: 13000,
       lastDashTime: 0,
 
-      // 광폭 자동 추적
+      // 광폭 자동 추적 및 W 평타 강화 시스템
       isAutoRunning: false,
       autoRunEndTime: 0,
+      wEmpowered: false,       // 평타 강화 켜짐 여부
+      wEmpoweredUsed: false,   // 광폭 동안 1회 사용 제한
 
       // Q 스킬
       isQCharging: false,
@@ -125,9 +124,10 @@
       qCooldownTime: 10000,
       lastQTime: 0,
 
-      // E 스킬
+      // E 스킬 (차징 방향 고정)
       isECharging: false,
       eChargeStart: 0,
+      eAngle: 0,               // 차징 시작 시 마우스 방향 고정
       eMaxChargeTime: 900,
       eMinRange: 20,
       eMaxRange: 90,
@@ -138,8 +138,8 @@
       // 평타 & 타겟팅
       isTargetingDummy: false,
       attackRange: 63 * (2 / 3),
-      defaultAttackInterval: 1500, // 일반 평타 주기: 1.5초
-      autoAttackInterval: 1000,    // W 광폭 평타 주기: 1.0초
+      defaultAttackInterval: 1500,
+      autoAttackInterval: 1000,
       isInAttackRange: false,
       lastAttackTime: 0,
       hasSpawnedAoEThisCycle: false,
@@ -149,14 +149,10 @@
     let playerScale = 1.0;
     let dummyScale = 1.0;
 
+    // 더미 마우스 오버 판정 (원형)
     function isMouseOverDummy() {
-      const box = {
-        minX: dummy.x - dummy.bodyWidth / 2 - 8,
-        maxX: dummy.x + dummy.bodyWidth / 2 + 8,
-        minY: dummy.y - dummy.headHeight - 8,
-        maxY: dummy.y + dummy.bodyHeight + 8
-      };
-      return mouseX >= box.minX && mouseX <= box.maxX && mouseY >= box.minY && mouseY <= box.maxY;
+      const dist = Math.hypot(mouseX - dummy.x, mouseY - dummy.y);
+      return dist <= dummy.radius + 8;
     }
 
     function isDummyInQRange() {
@@ -166,21 +162,13 @@
 
     window.addEventListener('keydown', (e) => {
       if ((e.key === 'w' || e.key === 'W') && !e.repeat && !player.isECharging) {
-        // 광폭 추적 중 W 재사용 시 평타 캔슬 (25% 크기 모션 + 붉은 이펙트)
+        // 광폭 추적 중 W 입력 시 1회에 한해 '평타 강화' 버프 켜기 (평타 딜레이 캔슬)
         if (player.isAutoRunning && !player.isDashing && !player.isQJumping) {
-          player.lastAttackTime = Date.now();
-          player.instantAttackScale = 0.25;
-
-          const maxR = 45;
-          aoeEffects.push({
-            x: player.x,
-            y: player.y,
-            radius: maxR * 0.8,
-            maxRadius: maxR,
-            alpha: 0.9,
-            isRed: true
-          });
-          player.hasSpawnedAoEThisCycle = true;
+          if (!player.wEmpoweredUsed) {
+            player.wEmpowered = true;
+            player.wEmpoweredUsed = true;
+            player.lastAttackTime = Date.now() - player.autoAttackInterval; // 즉시 평타 발동 캔슬
+          }
           return;
         }
 
@@ -193,6 +181,7 @@
         player.isQCharging = true;
       }
 
+      // E 스킬 누를 때의 마우스 방향을 고정(eAngle)
       if ((e.key === 'e' || e.key === 'E') && !e.repeat && !player.isECharging) {
         const now = Date.now();
         const eTimePassed = now - player.lastETime;
@@ -202,6 +191,7 @@
 
           player.isECharging = true;
           player.eChargeStart = now;
+          player.eAngle = Math.atan2(mouseY - player.y, mouseX - player.x); // 차징 방향 고정
 
           player.targetX = player.x;
           player.targetY = player.y;
@@ -257,7 +247,7 @@
         player.isQCharging = false;
       }
 
-      // E 스킬
+      // E 스킬 (고정된 eAngle 방향으로 밀쳐내기 발동)
       if (e.key === 'e' || e.key === 'E') {
         if (player.isECharging) {
           const chargedTime = now - player.eChargeStart;
@@ -265,9 +255,7 @@
 
           if (isFullCharged) {
             const currentLength = player.eMaxRange;
-            const dx = mouseX - player.x;
-            const dy = mouseY - player.y;
-            const angle = Math.atan2(dy, dx);
+            const angle = player.eAngle; // 차징 시작 시 고정된 방향 사용
 
             const dummyDx = dummy.x - player.x;
             const dummyDy = dummy.y - player.y;
@@ -276,9 +264,8 @@
 
             if (localX >= 0 && localX <= currentLength && Math.abs(localY) <= player.eWidth / 2) {
               const pushForce = 22;
-              const dist = Math.hypot(dx, dy) || 1;
-              dummy.vx = (dx / dist) * pushForce;
-              dummy.vy = (dy / dist) * pushForce;
+              dummy.vx = Math.cos(angle) * pushForce;
+              dummy.vy = Math.sin(angle) * pushForce;
             }
 
             knockbackRects.push({
@@ -300,30 +287,23 @@
       }
     });
 
+    // 원-원 충돌 처리
     function handleCollision() {
-      const box = {
-        minX: dummy.x - dummy.bodyWidth / 2,
-        maxX: dummy.x + dummy.bodyWidth / 2,
-        minY: dummy.y - dummy.headHeight,
-        maxY: dummy.y + dummy.bodyHeight
-      };
+      const dx = player.x - dummy.x;
+      const dy = player.y - dummy.y;
+      const distance = Math.hypot(dx, dy);
+      const minDistance = player.radius + dummy.radius;
 
-      const closestX = Math.max(box.minX, Math.min(player.x, box.maxX));
-      const closestY = Math.max(box.minY, Math.min(player.y, box.maxY));
-
-      let dx = player.x - closestX;
-      let dy = player.y - closestY;
-      let distance = Math.hypot(dx, dy);
-
-      if (distance < player.radius) {
+      if (distance < minDistance) {
+        let nx = dx / distance;
+        let ny = dy / distance;
         if (distance === 0) {
-          dx = -1;
-          distance = 1;
+          nx = -1;
+          ny = 0;
         }
-
-        const overlap = player.radius - distance;
-        player.x += (dx / distance) * overlap;
-        player.y += (dy / distance) * overlap;
+        const overlap = minDistance - distance;
+        player.x += nx * overlap;
+        player.y += ny * overlap;
       }
     }
 
@@ -345,6 +325,7 @@
         if (now > player.autoRunEndTime) {
           player.isAutoRunning = false;
           player.isTargetingDummy = false;
+          player.wEmpowered = false;
         } else {
           player.isTargetingDummy = true;
         }
@@ -374,26 +355,38 @@
         player.isInAttackRange = false;
       }
 
-      // 현재 상태에 따른 평타 주기 계산 (W 광폭 추적 시 1000ms, 일반 1500ms)
       const currentAttackInterval = player.isAutoRunning ? player.autoAttackInterval : player.defaultAttackInterval;
 
+      // 평타 공격 시점 처리
       if (player.isInAttackRange && !player.isDashing && !player.isQJumping && !player.isECharging) {
         if (!player.lastAttackTime) player.lastAttackTime = now;
 
         const cycle = (now - player.lastAttackTime) % currentAttackInterval;
 
+        // 실제 평타 타격 순간
         if (player.isAutoRunning && cycle < 50 && !player.hasSpawnedAoEThisCycle) {
           const maxR = 45;
+          const isEmpowered = player.wEmpowered;
+
           aoeEffects.push({
             x: player.x,
             y: player.y,
             radius: maxR * 0.8,
             maxRadius: maxR,
-            alpha: 0.7,
-            isRed: false
+            alpha: isEmpowered ? 0.9 : 0.7,
+            isRed: isEmpowered // 평타 강회가 활성화된 상태면 붉은색 이펙트 발동
           });
+
+          if (isEmpowered) {
+            player.instantAttackScale = 0.25; // 강화 평타 25% 크기 모션
+            player.wEmpowered = false;          // 강화 평타 소모
+          } else {
+            player.instantAttackScale = 0.075;
+          }
+
           player.hasSpawnedAoEThisCycle = true;
         }
+
         if (cycle >= 50) {
           player.hasSpawnedAoEThisCycle = false;
         }
@@ -417,6 +410,7 @@
         player.instantAttackScale = 0.075;
       }
 
+      // 바닥 원형 이펙트
       for (let i = aoeEffects.length - 1; i >= 0; i--) {
         const fx = aoeEffects[i];
         fx.radius += 2.5;
@@ -461,6 +455,8 @@
           player.isDashing = false;
           player.isAutoRunning = true;
           player.autoRunEndTime = Date.now() + 8000;
+          player.wEmpowered = false;
+          player.wEmpoweredUsed = false; // 광폭 진입 시 강화 평타 기회 초기화
         }
       } else if (!player.isECharging) {
         const dx = player.targetX - player.x;
@@ -574,7 +570,7 @@
         ctx.arc(fx.x, fx.y, fx.radius, 0, Math.PI * 2);
 
         if (fx.isRed) {
-          ctx.fillStyle = `rgba(255, 30, 30, ${fx.alpha * 0.4})`;
+          ctx.fillStyle = `rgba(255, 30, 30, ${fx.alpha * 0.45})`;
           ctx.strokeStyle = `rgba(255, 0, 0, ${fx.alpha})`;
         } else {
           ctx.fillStyle = `rgba(255, 0, 255, ${fx.alpha * 0.35})`;
@@ -604,7 +600,7 @@
       if (player.isQCharging && isMouseOverDummy() && isDummyInQRange()) {
         ctx.save();
         ctx.beginPath();
-        ctx.arc(dummy.x, dummy.y + 7, 24, 0, Math.PI * 2);
+        ctx.arc(dummy.x, dummy.y, 22, 0, Math.PI * 2);
         ctx.fillStyle = isQReady ? 'rgba(255, 215, 0, 0.3)' : 'rgba(255, 68, 68, 0.3)';
         ctx.fill();
         ctx.strokeStyle = isQReady ? '#FFD700' : '#FF4444';
@@ -613,15 +609,22 @@
         ctx.restore();
       }
 
+      // 원형 더미 그리기 (아이보리 몸통 + 상단 어두운 연두색 모자 포인트)
       ctx.save();
-      ctx.translate(dummy.x, dummy.y + 7);
+      ctx.translate(dummy.x, dummy.y);
       ctx.scale(dummyScale, dummyScale);
 
+      ctx.beginPath();
+      ctx.arc(0, 0, dummy.radius, 0, Math.PI * 2);
       ctx.fillStyle = dummy.bodyColor;
-      ctx.fillRect(-dummy.bodyWidth / 2, -7, dummy.bodyWidth, dummy.bodyHeight);
+      ctx.fill();
 
+      // 상단 어두운 연두색 헤드
+      ctx.beginPath();
+      ctx.arc(0, -3, dummy.radius * 0.65, Math.PI, Math.PI * 2);
       ctx.fillStyle = dummy.headColor;
-      ctx.fillRect(-dummy.headWidth / 2, -7 - dummy.headHeight, dummy.headWidth, dummy.headHeight);
+      ctx.fill();
+
       ctx.restore();
 
       if (player.isCharging) {
@@ -647,20 +650,17 @@
         drawRangeCircle(player.x, player.y, player.qRange);
       }
 
+      // E 차징 영역 표시 (고정된 eAngle 사용)
       if (player.isECharging) {
         const chargedTime = Math.min(player.eMaxChargeTime, now - player.eChargeStart);
         const ratio = chargedTime / player.eMaxChargeTime;
         const currentLength = player.eMinRange + (player.eMaxRange - player.eMinRange) * ratio;
 
-        const dx = mouseX - player.x;
-        const dy = mouseY - player.y;
-        const angle = Math.atan2(dy, dx);
-
         const isFullCharged = ratio >= 1.0;
 
         ctx.save();
         ctx.translate(player.x, player.y);
-        ctx.rotate(angle);
+        ctx.rotate(player.eAngle); // 고정 방향으로 그리기
 
         ctx.fillStyle = isFullCharged ? 'rgba(255, 20, 147, 0.35)' : 'rgba(0, 191, 255, 0.18)';
         ctx.strokeStyle = isFullCharged ? '#FF1493' : 'rgba(0, 191, 255, 0.6)';
@@ -686,8 +686,8 @@
       ctx.fillStyle = player.color;
       ctx.fill();
       if (player.isAutoRunning) {
-        ctx.strokeStyle = '#FF1493';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = player.wEmpowered ? '#FF0000' : '#FF1493'; // 강화 상태 시 붉은 테두리 강조
+        ctx.lineWidth = player.wEmpowered ? 4 : 3;
         ctx.stroke();
       }
       ctx.closePath();
@@ -704,7 +704,8 @@
       const wText = isInfiniteCooldown ? 'W:무제한' : (wCooldownRemaining > 0 ? `W:${wCooldownRemaining.toFixed(1)}초` : 'W:가능');
       const qText = isInfiniteCooldown ? 'Q:무제한' : (qCooldownRemaining > 0 ? `Q:${qCooldownRemaining.toFixed(1)}초` : 'Q:가능');
       const eText = isInfiniteCooldown ? 'E:무제한' : (eCooldownRemaining > 0 ? `E:${eCooldownRemaining.toFixed(1)}초` : 'E:가능');
-      const statusText = player.isAutoRunning ? ` | [광폭 추적 중: ${((player.autoRunEndTime - now)/1000).toFixed(1)}초]` : '';
+      const empoweredText = player.wEmpowered ? ' [평타 강화 준비됨]' : '';
+      const statusText = player.isAutoRunning ? ` | [광폭 추적 중: ${((player.autoRunEndTime - now)/1000).toFixed(1)}초${empoweredText}]` : '';
 
       ctx.fillText(`${wText} | ${qText} | ${eText}${statusText}`, 20, 32);
     }
@@ -716,6 +717,9 @@
     }
 
     loop();
+  </script>
+</body>
+</html>
   </script>
 </body>
 </html>
