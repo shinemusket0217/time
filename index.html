@@ -28,16 +28,25 @@
     window.addEventListener('resize', resize);
     resize();
 
+    // 마우스 좌표 실시간 추적
+    let mouseX = canvas.width / 2;
+    let mouseY = canvas.height / 2;
+
+    window.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    });
+
     // 1. 더미 (허수아비)
     const dummy = {
       x: canvas.width / 2 + 150,
       y: canvas.height / 2,
       bodyWidth: 20,
       bodyHeight: 30,
-      headWidth: 20,       // 몸통 너비와 동일하게 수정
+      headWidth: 20,
       headHeight: 16,
-      bodyColor: '#FFFFE0', // 아이보리색
-      headColor: '#558B2F'  // 짙은 연두색
+      bodyColor: '#FFFFE0',
+      headColor: '#558B2F'
     };
 
     // 2. 플레이어 (핑크색 원)
@@ -48,12 +57,33 @@
       targetY: canvas.height / 2,
       radius: 15,
       color: '#FF69B4',
-      speed: 5 / 3         // 속도 1/3로 축소 (~1.67)
+      speed: 10 / 3,      // 속도 2배 증가 (~3.33)
+      dashDistance: 70   // W키 돌진 거리 (픽셀)
     };
 
+    // 마우스 클릭 시 목표 지점 이동
     window.addEventListener('click', (e) => {
       player.targetX = e.clientX;
       player.targetY = e.clientY;
+    });
+
+    // W키 누를 때 마우스 방향으로 돌진
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'w' || e.key === 'W') {
+        const dx = mouseX - player.x;
+        const dy = mouseY - player.y;
+        const distance = Math.hypot(dx, dy);
+
+        if (distance > 0) {
+          // 마우스 방향으로 돌진 거리만큼 순간 이동
+          player.x += (dx / distance) * player.dashDistance;
+          player.y += (dy / distance) * player.dashDistance;
+          
+          // 돌진 후 목표 지점을 현재 위치로 재설정 (기존 이동 경로 초기화)
+          player.targetX = player.x;
+          player.targetY = player.y;
+        }
+      }
     });
 
     function update() {
@@ -94,10 +124,6 @@
       requestAnimationFrame(loop);
     }
 
-    loop();
-  </script>
-</body>
-</html>
     loop();
   </script>
 </body>
