@@ -71,14 +71,14 @@
       isMouseDown = false;
     });
 
-    // 1. 더미 (허수아비)
+    // 1. 더미 (전체 24x24 정사각형 모형)
     const dummy = {
       x: canvas.width / 2 + 150,
       y: canvas.height / 2,
-      bodyWidth: 20,
-      bodyHeight: 30,
-      headWidth: 20,
-      headHeight: 16,
+      bodyWidth: 24,
+      bodyHeight: 14,
+      headWidth: 24,
+      headHeight: 10, // 총 높이 24 (14 + 10) x 총 너비 24 정사각형
       bodyColor: '#FFFFE0',
       headColor: '#558B2F',
       vx: 0,
@@ -95,7 +95,7 @@
       color: '#FF69B4',
       speed: 10 / 3,
 
-      // W 돌진 & 자동 추적
+      // W 돌진 & 광폭 자동 추적
       isCharging: false,
       isDashing: false,
       dashSpeed: 10.5,
@@ -110,7 +110,7 @@
       isAutoRunning: false,
       autoRunEndTime: 0,
 
-      // Q 스킬
+      // Q 스킬 (거리 비례 포물선 높이)
       isQCharging: false,
       isQJumping: false,
       qRange: 112,
@@ -120,14 +120,15 @@
       qStartY: 0,
       qTargetX: 0,
       qTargetY: 0,
-      qArcMax: 30,
+      qArcMax: 30,           // 최대 거리에서의 높이 (30px)
+      currentQArcMax: 30,    // 현재 점프 거리 비례 높이
       qCooldownTime: 10000,
       lastQTime: 0,
 
-      // E 스킬 (1.5초 차징)
+      // E 스킬
       isECharging: false,
       eChargeStart: 0,
-      eMaxChargeTime: 1500,
+      eMaxChargeTime: 900,  // 0.9초
       eMinRange: 20,
       eMaxRange: 90,
       eWidth: 65,
@@ -139,7 +140,8 @@
       attackRange: 63 * (2 / 3),
       isInAttackRange: false,
       lastAttackTime: 0,
-      hasSpawnedAoEThisCycle: false
+      hasSpawnedAoEThisCycle: false,
+      instantAttackScale: 0.075 // 기본 7.5%, W캔슬 시 15% 적용
     };
 
     let playerScale = 1.0;
@@ -161,12 +163,33 @@
     }
 
     window.addEventListener('keydown', (e) => {
-      if ((e.key === 'w' || e.key === 'W') && !e.repeat && !player.isAutoRunning && !player.isECharging) {
-        player.isCharging = true;
+      if ((e.key === 'w' || e.key === 'W') && !e.repeat && !player.isECharging) {
+        // 광폭 추적 중일 때 W 누르면 즉시 평타 캔슬 실행
+        if (player.isAutoRunning && !player.isDashing && !player.isQJumping) {
+          player.lastAttackTime = Date.now(); // 평타 쿨타임 초기화
+          player.instantAttackScale = 0.15;   // 이번 평타 크기 변화 15% 적용
+
+          // 즉시 평타 자홍색 이펙트 생성
+          aoeEffects.push({
+            x: player.x,
+            y: player.y,
+            radius: 10,
+            maxRadius: 45,
+            alpha: 0.8
+          });
+          player.hasSpawnedAoEThisCycle = true;
+          return;
+        }
+
+        if (!player.isAutoRunning) {
+          player.isCharging = true;
+        }
       }
+
       if ((e.key === 'q' || e.key === 'Q') && !e.repeat && !player.isECharging) {
         player.isQCharging = true;
       }
+
       if ((e.key === 'e' || e.key === 'E') && !e.repeat && !player.isECharging) {
         const now = Date.now();
         const eTimePassed = now - player.lastETime;
@@ -186,29 +209,31 @@
     window.addEventListener('keyup', (e) => {
       const now = Date.now();
 
-      // W 돌진
+      // W 돌진 (일반 상태)
       if (e.key === 'w' || e.key === 'W') {
-        const timePassed = now - player.lastDashTime;
-        const canUseW = isInfiniteCooldown || (timePassed >= player.cooldownTime);
+        if (!player.isAutoRunning) {
+          const timePassed = now - player.lastDashTime;
+          const canUseW = isInfiniteCooldown || (timePassed >= player.cooldownTime);
 
-        if (player.isCharging && canUseW && !player.isDashing && !player.isQJumping && !player.isECharging) {
-          const dx = mouseX - player.x;
-          const dy = mouseY - player.y;
-          const distance = Math.hypot(dx, dy);
+          if (player.isCharging && canUseW && !player.isDashing && !player.isQJumping && !player.isECharging) {
+            const dx = mouseX - player.x;
+            const dy = mouseY - player.y;
+            const distance = Math.hypot(dx, dy);
 
-          if (distance > 0) {
-            player.isDashing = true;
-            player.dashTimeLeft = player.dashDuration;
-            player.dashDirX = dx / distance;
-            player.dashDirY = dy / distance;
-            player.lastDashTime = now;
-            player.isTargetingDummy = false;
+            if (distance > 0) {
+              player.isDashing = true;
+              player.dashTimeLeft = player.dashDuration;
+              player.dashDirX = dx / distance;
+              player.dashDirY = dy / distance;
+              player.lastDashTime = now;
+              player.isTargetingDummy = false;
+            }
           }
+          player.isCharging = false;
         }
-        player.isCharging = false;
       }
 
-      // Q 도약
+      // Q 도약 (거리 비례 포물선 높이 계산)
       if (e.key === 'q' || e.key === 'Q') {
         const qTimePassed = now - player.lastQTime;
         const canUseQ = isInfiniteCooldown || (qTimePassed >= player.qCooldownTime);
@@ -220,47 +245,54 @@
           player.qStartY = player.y;
           player.qTargetX = dummy.x;
           player.qTargetY = dummy.y;
+
+          // 거리 비율 계산 (가까울수록 포물선 높이 감소)
+          const jumpDistance = Math.hypot(dummy.x - player.x, dummy.y - player.y);
+          player.currentQArcMax = player.qArcMax * Math.min(1.0, jumpDistance / player.qRange);
+
           player.lastQTime = now;
         }
         player.isQCharging = false;
       }
 
-      // E 사각형 밀쳐내기 (발동 시 파동 이펙트 뻗어나감)
+      // E 스킬 (0.9초 풀차징 판정)
       if (e.key === 'e' || e.key === 'E') {
         if (player.isECharging) {
-          const chargedTime = Math.min(player.eMaxChargeTime, now - player.eChargeStart);
-          const ratio = chargedTime / player.eMaxChargeTime;
-          const currentLength = player.eMinRange + (player.eMaxRange - player.eMinRange) * ratio;
+          const chargedTime = now - player.eChargeStart;
+          const isFullCharged = chargedTime >= player.eMaxChargeTime;
 
-          const dx = mouseX - player.x;
-          const dy = mouseY - player.y;
-          const angle = Math.atan2(dy, dx);
+          if (isFullCharged) {
+            const currentLength = player.eMaxRange;
+            const dx = mouseX - player.x;
+            const dy = mouseY - player.y;
+            const angle = Math.atan2(dy, dx);
 
-          const dummyDx = dummy.x - player.x;
-          const dummyDy = dummy.y - player.y;
-          const localX = dummyDx * Math.cos(-angle) - dummyDy * Math.sin(-angle);
-          const localY = dummyDx * Math.sin(-angle) + dummyDy * Math.cos(-angle);
+            const dummyDx = dummy.x - player.x;
+            const dummyDy = dummy.y - player.y;
+            const localX = dummyDx * Math.cos(-angle) - dummyDy * Math.sin(-angle);
+            const localY = dummyDx * Math.sin(-angle) + dummyDy * Math.cos(-angle);
 
-          if (localX >= 0 && localX <= currentLength && Math.abs(localY) <= player.eWidth / 2) {
-            const pushForce = 12 + ratio * 10;
-            const dist = Math.hypot(dx, dy) || 1;
-            dummy.vx = (dx / dist) * pushForce;
-            dummy.vy = (dy / dist) * pushForce;
+            if (localX >= 0 && localX <= currentLength && Math.abs(localY) <= player.eWidth / 2) {
+              const pushForce = 22;
+              const dist = Math.hypot(dx, dy) || 1;
+              dummy.vx = (dx / dist) * pushForce;
+              dummy.vy = (dy / dist) * pushForce;
+            }
+
+            knockbackRects.push({
+              x: player.x,
+              y: player.y,
+              angle: angle,
+              width: player.eWidth,
+              currentLength: 0,
+              maxLength: currentLength,
+              speed: currentLength / 4,
+              alpha: 1.0
+            });
+
+            player.lastETime = now;
           }
 
-          // 빠르게 뻗어나가는 자홍색 사각형 충격파 생성
-          knockbackRects.push({
-            x: player.x,
-            y: player.y,
-            angle: angle,
-            width: player.eWidth,
-            currentLength: 0,
-            maxLength: currentLength,
-            speed: currentLength / 4, // 4프레임 만에 전체 범위까지 팽창
-            alpha: 1.0
-          });
-
-          player.lastETime = now;
           player.isECharging = false;
         }
       }
@@ -340,6 +372,7 @@
         player.isInAttackRange = false;
       }
 
+      // 2. 평타 애니메이션 (W캔슬 시 15% 크기 적용)
       if (player.isInAttackRange && !player.isDashing && !player.isQJumping && !player.isECharging) {
         if (!player.lastAttackTime) player.lastAttackTime = now;
 
@@ -362,20 +395,21 @@
         if (cycle < 250) {
           const progress = cycle / 250;
           const pulse = Math.sin(progress * Math.PI);
-          playerScale = 1 + pulse * 0.15;
-          dummyScale = 1 - pulse * 0.15;
+          playerScale = 1 + pulse * player.instantAttackScale;
+          dummyScale = 1 - pulse * player.instantAttackScale;
         } else {
           playerScale = 1.0;
           dummyScale = 1.0;
+          player.instantAttackScale = 0.075; // 평타 모션이 끝나면 기본 7.5%로 복구
         }
       } else {
         player.lastAttackTime = 0;
         player.hasSpawnedAoEThisCycle = false;
         playerScale = 1.0;
         dummyScale = 1.0;
+        player.instantAttackScale = 0.075;
       }
 
-      // 자홍색 평타 타격 피드백 이펙트
       for (let i = aoeEffects.length - 1; i >= 0; i--) {
         const fx = aoeEffects[i];
         fx.radius += 7;
@@ -385,13 +419,12 @@
         }
       }
 
-      // E 스킬 사각형 자홍색 파동 팽창 및 소멸 처리
       for (let i = knockbackRects.length - 1; i >= 0; i--) {
         const rect = knockbackRects[i];
         rect.currentLength += rect.speed;
         if (rect.currentLength >= rect.maxLength) {
           rect.currentLength = rect.maxLength;
-          rect.alpha -= 0.15; // 빠르게 투명해지며 사라짐
+          rect.alpha -= 0.15;
         }
         if (rect.alpha <= 0) {
           knockbackRects.splice(i, 1);
@@ -528,7 +561,6 @@
       const qTimePassed = now - player.lastQTime;
       const isQReady = isInfiniteCooldown || (qTimePassed >= player.qCooldownTime);
 
-      // 자홍색 평타 타격 원형 파동
       for (const fx of aoeEffects) {
         ctx.save();
         ctx.beginPath();
@@ -541,7 +573,6 @@
         ctx.restore();
       }
 
-      // E 스킬 발동 시 빠르게 확장되는 자홍색 충격파 애니메이션
       for (const rect of knockbackRects) {
         ctx.save();
         ctx.translate(rect.x, rect.y);
@@ -556,7 +587,6 @@
         ctx.restore();
       }
 
-      // 더미 하이라이트
       if (player.isQCharging && isMouseOverDummy() && isDummyInQRange()) {
         ctx.save();
         ctx.beginPath();
@@ -569,7 +599,7 @@
         ctx.restore();
       }
 
-      // 더미 그리기
+      // 정사각형 더미 그리기
       ctx.save();
       ctx.translate(dummy.x, dummy.y + 7);
       ctx.scale(dummyScale, dummyScale);
@@ -581,7 +611,6 @@
       ctx.fillRect(-dummy.headWidth / 2, -7 - dummy.headHeight, dummy.headWidth, dummy.headHeight);
       ctx.restore();
 
-      // W 조준 표시
       if (player.isCharging) {
         const wDist = player.dashSpeed * player.dashDuration;
         drawRangeCircle(player.x, player.y, wDist);
@@ -601,12 +630,10 @@
         }
       }
 
-      // Q 조준 표시
       if (player.isQCharging) {
         drawRangeCircle(player.x, player.y, player.qRange);
       }
 
-      // E 차징 표시 (차징 중엔 하늘색 -> 풀차징 시 자홍색으로 완성 신호)
       if (player.isECharging) {
         const chargedTime = Math.min(player.eMaxChargeTime, now - player.eChargeStart);
         const ratio = chargedTime / player.eMaxChargeTime;
@@ -622,7 +649,6 @@
         ctx.translate(player.x, player.y);
         ctx.rotate(angle);
 
-        // 기본 차징 시 반투명 하늘색, 1.5초 풀차징 도달 시 선명한 자홍색 빛으로 변경
         ctx.fillStyle = isFullCharged ? 'rgba(255, 20, 147, 0.35)' : 'rgba(0, 191, 255, 0.18)';
         ctx.strokeStyle = isFullCharged ? '#FF1493' : 'rgba(0, 191, 255, 0.6)';
         ctx.lineWidth = isFullCharged ? 2.5 : 1.5;
@@ -635,15 +661,14 @@
         ctx.restore();
       }
 
-      // 플레이어 위치 오프셋
+      // Q 도약 시 거리 비례 높이 적용
       let renderY = player.y;
       if (player.isQJumping) {
         const t = 1 - (player.qTimeLeft / player.qDuration);
-        const arcOffset = 4 * player.qArcMax * t * (1 - t);
+        const arcOffset = 4 * player.currentQArcMax * t * (1 - t);
         renderY -= arcOffset;
       }
 
-      // 플레이어 그리기
       ctx.beginPath();
       ctx.arc(player.x, renderY, player.radius * playerScale, 0, Math.PI * 2);
       ctx.fillStyle = player.color;
@@ -655,7 +680,6 @@
       }
       ctx.closePath();
 
-      // UI
       drawHourglassButton();
 
       const wCooldownRemaining = Math.max(0, (player.cooldownTime - (now - player.lastDashTime)) / 1000);
@@ -679,10 +703,6 @@
       requestAnimationFrame(loop);
     }
 
-    loop();
-  </script>
-</body>
-</html>
     loop();
   </script>
 </body>
