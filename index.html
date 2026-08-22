@@ -135,7 +135,7 @@
       eCooldownTime: 8000,
       lastETime: 0,
 
-      // 평타 & 타겟팅 & 정지 딜레이 제어
+      // 평타 & 타겟팅
       isTargetingDummy: false,
       attackRange: 63 * (2 / 3),
       defaultAttackInterval: 1500,
@@ -144,7 +144,7 @@
       lastAttackTime: 0,
       hasSpawnedAoEThisCycle: false,
       instantAttackScale: 0.075,
-      stopDelayTimer: 0 // 사거리 접근 시 즉시 정지 방지용 유예 타이머
+      stopDelayTimer: 0
     };
 
     let playerScale = 1.0;
@@ -339,14 +339,12 @@
         const dy = dummy.y - player.y;
         const distToDummy = Math.hypot(dx, dy);
 
-        // 평타 사거리 외부에 있을 때: 사거리 안쪽 깊숙하게(attackRange - 6px) 목표 설정
         if (distToDummy > player.attackRange) {
           player.targetX = dummy.x - (dx / distToDummy) * (player.attackRange - 6);
           player.targetY = dummy.y - (dy / distToDummy) * (player.attackRange - 6);
           player.isInAttackRange = false;
-          player.stopDelayTimer = 5; // 접근 진입 시 5프레임 정지 유예 보장
+          player.stopDelayTimer = 5;
         } else {
-          // 사거리 내부 진입 시 바로 딱 멈추지 않고, 약간의 딜레이(stopDelayTimer) 동안 접근 관성 유지
           if (player.stopDelayTimer > 0) {
             player.stopDelayTimer--;
           } else {
@@ -361,30 +359,37 @@
 
       const currentAttackInterval = player.isAutoRunning ? player.autoAttackInterval : player.defaultAttackInterval;
 
+      // 평타 이펙트 생성 로직 (W상태: 자홍색/붉은색, 일반상태: 투명 금색)
       if (player.isInAttackRange && !player.isDashing && !player.isQJumping && !player.isECharging) {
         if (!player.lastAttackTime) player.lastAttackTime = now;
 
         const cycle = (now - player.lastAttackTime) % currentAttackInterval;
 
-        if (player.isAutoRunning && cycle < 50 && !player.hasSpawnedAoEThisCycle) {
+        if (cycle < 50 && !player.hasSpawnedAoEThisCycle) {
           const maxR = 45;
-          const isEmpowered = player.wEmpowered;
+          let effectType = 'gold';
+
+          if (player.isAutoRunning) {
+            effectType = player.wEmpowered ? 'red' : 'magenta';
+            if (player.wEmpowered) {
+              player.instantAttackScale = 0.25;
+              player.wEmpowered = false;
+            } else {
+              player.instantAttackScale = 0.075;
+            }
+          } else {
+            effectType = 'gold';
+            player.instantAttackScale = 0.075;
+          }
 
           aoeEffects.push({
             x: player.x,
             y: player.y,
             radius: maxR * 0.8,
             maxRadius: maxR,
-            alpha: isEmpowered ? 0.9 : 0.7,
-            isRed: isEmpowered
+            alpha: 0.5, // 이펙트 기본 알프값 낮춤
+            effectType: effectType
           });
-
-          if (isEmpowered) {
-            player.instantAttackScale = 0.25;
-            player.wEmpowered = false;
-          } else {
-            player.instantAttackScale = 0.075;
-          }
 
           player.hasSpawnedAoEThisCycle = true;
         }
@@ -415,7 +420,7 @@
       for (let i = aoeEffects.length - 1; i >= 0; i--) {
         const fx = aoeEffects[i];
         fx.radius += 2.5;
-        fx.alpha -= 0.1;
+        fx.alpha -= 0.08;
         if (fx.alpha <= 0 || fx.radius >= fx.maxRadius) {
           aoeEffects.splice(i, 1);
         }
@@ -565,21 +570,28 @@
       const qTimePassed = now - player.lastQTime;
       const isQReady = isInfiniteCooldown || (qTimePassed >= player.qCooldownTime);
 
+      // 평타 이펙트 렌더링
       for (const fx of aoeEffects) {
         ctx.save();
         ctx.beginPath();
         ctx.arc(fx.x, fx.y, fx.radius, 0, Math.PI * 2);
 
-        if (fx.isRed) {
-          ctx.fillStyle = `rgba(255, 30, 30, ${fx.alpha * 0.45})`;
-          ctx.strokeStyle = `rgba(255, 0, 0, ${fx.alpha})`;
+        if (fx.effectType === 'red') {
+          // W캔슬 강화 평타 (투명한 붉은색)
+          ctx.fillStyle = `rgba(255, 30, 30, ${fx.alpha * 0.35})`;
+          ctx.strokeStyle = `rgba(255, 0, 0, ${fx.alpha * 0.6})`;
+        } else if (fx.effectType === 'magenta') {
+          // W 상태 평타 (더 은은하고 투명한 자홍색)
+          ctx.fillStyle = `rgba(255, 0, 255, ${fx.alpha * 0.18})`;
+          ctx.strokeStyle = `rgba(255, 20, 147, ${fx.alpha * 0.45})`;
         } else {
-          ctx.fillStyle = `rgba(255, 0, 255, ${fx.alpha * 0.35})`;
-          ctx.strokeStyle = `rgba(255, 20, 147, ${fx.alpha})`;
+          // 일반 상태 평타 (투명한 금색)
+          ctx.fillStyle = `rgba(255, 215, 0, ${fx.alpha * 0.22})`;
+          ctx.strokeStyle = `rgba(255, 215, 0, ${fx.alpha * 0.55})`;
         }
 
         ctx.fill();
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = 2;
         ctx.stroke();
         ctx.restore();
       }
@@ -610,7 +622,7 @@
         ctx.restore();
       }
 
-      // 원형 더미그리기
+      // 더미 그리기
       ctx.save();
       ctx.translate(dummy.x, dummy.y);
       ctx.scale(dummyScale, dummyScale);
